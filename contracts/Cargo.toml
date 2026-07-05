@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+    "receivable_registry",
+    "fractional_sale",
+    "settlement_escrow",
+]
+
+[workspace.dependencies]
+soroban-sdk = { version = "21.7.6", features = ["testutils"] }

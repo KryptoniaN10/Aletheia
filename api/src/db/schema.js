@@ -1,0 +1,97 @@
+// ── SQLite schema for off-chain metadata ──────────────────────
+//  Stores doc metadata, KYC sessions, and receivable state
+//  that doesn't live on-chain (e.g. IPFS CIDs, exporter details)
+
+import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DB_PATH = process.env.DATABASE_URL || path.join(__dirname, '../../../malabar.db');
+
+let db;
+
+export function getDb() {
+  if (!db) throw new Error('DB not initialized — call initDb() first');
+  return db;
+}
+
+export async function initDb() {
+  db = new Database(DB_PATH);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+
+  db.exec(`
+    -- ── Receivables ──────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS receivables (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      chain_id            TEXT,           -- on-chain receivable ID (returned by contract)
+      exporter_address    TEXT NOT NULL,
+      exporter_name       TEXT,
+      buyer_name          TEXT,
+      buyer_country       TEXT,
+      amount_usd          REAL NOT NULL,
+      currency            TEXT DEFAULT 'USDC',
+      maturity_date       TEXT NOT NULL,
+      doc_hash            TEXT NOT NULL,  -- SHA-256 hex of uploaded doc
+      ipfs_cid            TEXT,           -- Pinata/IPFS CID
+      doc_filename        TEXT,
+      iec_code            TEXT,           -- IEC (Importer-Exporter Code) of exporter
+      commodity           TEXT,           -- e.g. "Black Pepper", "Frozen Shrimp"
+      status              TEXT DEFAULT 'pending',  -- pending|attested|active|settled|clawback
+      attestation_count   INTEGER DEFAULT 0,
+      discount_bps        INTEGER,
+      token_asset_code    TEXT,
+      created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ── Attestations ─────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS attestations (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      receivable_id   INTEGER NOT NULL REFERENCES receivables(id),
+      attestor_address TEXT NOT NULL,
+      attestor_role   TEXT,   -- 'logistics', 'export_council', 'nbfc'
+      tx_hash         TEXT,
+      attested_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(receivable_id, attestor_address)
+    );
+
+    -- ── KYC Sessions ─────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS kyc_sessions (
+      id              TEXT PRIMARY KEY,   -- UUID
+      wallet_address  TEXT NOT NULL UNIQUE,
+      status          TEXT DEFAULT 'pending',  -- pending|approved|rejected
+      name            TEXT,
+      email           TEXT,
+      pan_number      TEXT,
+      started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+      completed_at    DATETIME
+    );
+
+    -- ── Investments ──────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS investments (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      receivable_id   INTEGER NOT NULL REFERENCES receivables(id),
+      investor_address TEXT NOT NULL,
+      share_cents     INTEGER NOT NULL,
+      payment_cents   INTEGER NOT NULL,   -- actual stablecoin paid (discounted)
+      tx_hash         TEXT,
+      invested_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ── Oracle Events ────────────────────────────────────────
+    CREATE TABLE IF NOT EXISTS oracle_events (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      receivable_id   INTEGER NOT NULL REFERENCES receivables(id),
+      event_type      TEXT,   -- 'payment_confirmed' | 'distributed' | 'clawback'
+      amount_cents    INTEGER,
+      proof           TEXT,
+      tx_hash         TEXT,
+      triggered_by    TEXT,
+      occurred_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  console.log('[DB] Schema initialized at', DB_PATH);
+}

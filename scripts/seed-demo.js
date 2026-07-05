@@ -1,0 +1,241 @@
+// ============================================================
+//  seed-demo.js — Malabar Ledger Demo Data Seeder
+//  Populates the database with realistic Kerala export
+//  receivables at every stage of the lifecycle, so judges
+//  can experience the full flow immediately on first load.
+//
+//  Usage:
+//    node scripts/seed-demo.js
+//  Or:
+//    npm run seed   (add to api/package.json scripts)
+// ============================================================
+
+import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DB_PATH = path.join(__dirname, '../malabar.db');
+
+const db = new Database(DB_PATH);
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
+// ── Schema (same as schema.js, idempotent) ────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS receivables (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    chain_id            TEXT,
+    exporter_address    TEXT NOT NULL,
+    exporter_name       TEXT,
+    buyer_name          TEXT,
+    buyer_country       TEXT,
+    amount_usd          REAL NOT NULL,
+    currency            TEXT DEFAULT 'USDC',
+    maturity_date       TEXT NOT NULL,
+    doc_hash            TEXT NOT NULL,
+    ipfs_cid            TEXT,
+    doc_filename        TEXT,
+    iec_code            TEXT,
+    commodity           TEXT,
+    status              TEXT DEFAULT 'pending',
+    attestation_count   INTEGER DEFAULT 0,
+    discount_bps        INTEGER,
+    token_asset_code    TEXT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS attestations (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    receivable_id   INTEGER NOT NULL REFERENCES receivables(id),
+    attestor_address TEXT NOT NULL,
+    attestor_role   TEXT,
+    tx_hash         TEXT,
+    attested_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(receivable_id, attestor_address)
+  );
+  CREATE TABLE IF NOT EXISTS kyc_sessions (
+    id              TEXT PRIMARY KEY,
+    wallet_address  TEXT NOT NULL UNIQUE,
+    status          TEXT DEFAULT 'pending',
+    name            TEXT,
+    email           TEXT,
+    pan_number      TEXT,
+    started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed_at    DATETIME
+  );
+  CREATE TABLE IF NOT EXISTS investments (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    receivable_id   INTEGER NOT NULL REFERENCES receivables(id),
+    investor_address TEXT NOT NULL,
+    share_cents     INTEGER NOT NULL,
+    payment_cents   INTEGER NOT NULL,
+    tx_hash         TEXT,
+    invested_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS oracle_events (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    receivable_id   INTEGER NOT NULL REFERENCES receivables(id),
+    event_type      TEXT,
+    amount_cents    INTEGER,
+    proof           TEXT,
+    tx_hash         TEXT,
+    triggered_by    TEXT,
+    occurred_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+function fakeHash(seed) {
+  return createHash('sha256').update(seed).digest('hex');
+}
+
+// ── Clear existing demo data ──────────────────────────────────
+console.log('🌊 Malabar Ledger — Demo Seeder');
+console.log('================================');
+
+const existing = db.prepare('SELECT COUNT(*) as c FROM receivables').get();
+if (existing.c > 0) {
+  console.log(`Found ${existing.c} existing receivables. Clearing for fresh seed...`);
+  db.exec('DELETE FROM oracle_events; DELETE FROM investments; DELETE FROM attestations; DELETE FROM receivables; DELETE FROM kyc_sessions;');
+}
+
+// ── Demo Wallets ──────────────────────────────────────────────
+const EXPORTER_1 = 'GDEMO1EXPORTER1KERALA1SPICES1KOZHIKODE1111111111111111111';
+const EXPORTER_2 = 'GDEMO2EXPORTER2KERALA2SEAFOOD2THRISSUR2222222222222222222';
+const INVESTOR_1 = 'GDEMO3INVESTOR1DIASPORA1NRI1DUBAI111111111111111111111111';
+const INVESTOR_2 = 'GDEMO4INVESTOR2LOCAL1CALICUT1ANGEL1111111111111111111111';
+const ATTESTOR_LOGISTICS = 'GDEMO5LOGISTICS1PARTNER1MALABAR1FREIGHT1111111111111111';
+const ATTESTOR_COUNCIL   = 'GDEMO6EXPORT1COUNCIL1SPICES1BOARD1KERALA111111111111111';
+const ATTESTOR_NBFC      = 'GDEMO7NBFC1KERALA1FINANCIAL1SERVICES1111111111111111111';
+
+// ── Seed: 5 receivables across the full lifecycle ─────────────
+
+// 1. PENDING — just registered, no attestations yet
+const r1 = db.prepare(`
+  INSERT INTO receivables (exporter_address, exporter_name, buyer_name, buyer_country,
+    amount_usd, maturity_date, doc_hash, doc_filename, iec_code, commodity, status, attestation_count)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0)
+`).run(
+  EXPORTER_1, 'Malabar Spice Exports Pvt Ltd',
+  'McCormick & Company Inc', 'United States',
+  75000, '2026-09-15',
+  fakeHash('r1-shipping-bill-black-pepper-batch-2026'),
+  'SB-2026-KZD-0412.pdf', '0812345678', 'Black Pepper'
+);
+console.log(`  ✓ Created receivable #${r1.lastInsertRowid}: Black Pepper $75,000 [PENDING]`);
+
+// 2. PENDING — 1 of 3 attestations received
+const r2 = db.prepare(`
+  INSERT INTO receivables (exporter_address, exporter_name, buyer_name, buyer_country,
+    amount_usd, maturity_date, doc_hash, doc_filename, iec_code, commodity, status, attestation_count)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1)
+`).run(
+  EXPORTER_1, 'Malabar Spice Exports Pvt Ltd',
+  'Olam International', 'Singapore',
+  42000, '2026-08-30',
+  fakeHash('r2-shipping-bill-cardamom-singapore-2026'),
+  'SB-2026-KZD-0389.pdf', '0812345678', 'Cardamom'
+);
+db.prepare(`
+  INSERT OR IGNORE INTO attestations (receivable_id, attestor_address, attestor_role, tx_hash)
+  VALUES (?, ?, 'logistics', ?)
+`).run(r2.lastInsertRowid, ATTESTOR_LOGISTICS, 'demoTx' + fakeHash('att-r2-logistics').slice(0, 12));
+console.log(`  ✓ Created receivable #${r2.lastInsertRowid}: Cardamom $42,000 [PENDING, 1/2 attest]`);
+
+// 3. ATTESTED — 2-of-3 signed, token minted, ready to list
+const r3 = db.prepare(`
+  INSERT INTO receivables (exporter_address, exporter_name, buyer_name, buyer_country,
+    amount_usd, maturity_date, doc_hash, doc_filename, iec_code, commodity, status,
+    attestation_count, token_asset_code)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'attested', 2, ?)
+`).run(
+  EXPORTER_2, 'Kerala Seafood Cooperative',
+  'Thai Union Group PCL', 'Thailand',
+  120000, '2026-10-01',
+  fakeHash('r3-bill-of-lading-frozen-shrimp-thailand'),
+  'BL-2026-KCHI-0021.pdf', '0923456789', 'Frozen Shrimp',
+  `ML${String(0).padStart(4, '0')}3`
+);
+db.prepare(`INSERT OR IGNORE INTO attestations (receivable_id, attestor_address, attestor_role, tx_hash) VALUES (?, ?, 'logistics', ?)`).run(r3.lastInsertRowid, ATTESTOR_LOGISTICS, 'demoTx' + fakeHash('att-r3-log').slice(0,12));
+db.prepare(`INSERT OR IGNORE INTO attestations (receivable_id, attestor_address, attestor_role, tx_hash) VALUES (?, ?, 'export_council', ?)`).run(r3.lastInsertRowid, ATTESTOR_COUNCIL, 'demoTx' + fakeHash('att-r3-cou').slice(0,12));
+console.log(`  ✓ Created receivable #${r3.lastInsertRowid}: Frozen Shrimp $120,000 [ATTESTED, token ML0003]`);
+
+// 4. ACTIVE — listed for sale, partial investment already received
+const r4 = db.prepare(`
+  INSERT INTO receivables (exporter_address, exporter_name, buyer_name, buyer_country,
+    amount_usd, maturity_date, doc_hash, doc_filename, iec_code, commodity, status,
+    attestation_count, token_asset_code, discount_bps)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 3, ?, 500)
+`).run(
+  EXPORTER_1, 'Malabar Spice Exports Pvt Ltd',
+  'Schwartz Flavour Group', 'United Kingdom',
+  50000, '2026-08-15',
+  fakeHash('r4-purchase-order-ginger-turmeric-uk-2026'),
+  'PO-2026-KZD-0201.pdf', '0812345678', 'Ginger & Turmeric',
+  `ML${String(0).padStart(4, '0')}4`
+);
+db.prepare(`INSERT OR IGNORE INTO attestations (receivable_id, attestor_address, attestor_role) VALUES (?, ?, 'logistics')`).run(r4.lastInsertRowid, ATTESTOR_LOGISTICS);
+db.prepare(`INSERT OR IGNORE INTO attestations (receivable_id, attestor_address, attestor_role) VALUES (?, ?, 'export_council')`).run(r4.lastInsertRowid, ATTESTOR_COUNCIL);
+db.prepare(`INSERT OR IGNORE INTO attestations (receivable_id, attestor_address, attestor_role) VALUES (?, ?, 'nbfc')`).run(r4.lastInsertRowid, ATTESTOR_NBFC);
+
+// Two investors have already bought in
+db.prepare(`INSERT INTO investments (receivable_id, investor_address, share_cents, payment_cents, tx_hash) VALUES (?, ?, ?, ?, ?)`).run(
+  r4.lastInsertRowid, INVESTOR_1, 2000000, 1900000, 'demoTx' + fakeHash('inv-r4-inv1').slice(0,12)
+);
+db.prepare(`INSERT INTO investments (receivable_id, investor_address, share_cents, payment_cents, tx_hash) VALUES (?, ?, ?, ?, ?)`).run(
+  r4.lastInsertRowid, INVESTOR_2, 1500000, 1425000, 'demoTx' + fakeHash('inv-r4-inv2').slice(0,12)
+);
+db.prepare(`INSERT INTO oracle_events (receivable_id, event_type, proof, triggered_by) VALUES (?, 'registered', 'seed', 'demo')`).run(r4.lastInsertRowid);
+console.log(`  ✓ Created receivable #${r4.lastInsertRowid}: Ginger & Turmeric $50,000 [ACTIVE, 70% subscribed]`);
+
+// 5. SETTLED — fully paid out, complete lifecycle
+const r5 = db.prepare(`
+  INSERT INTO receivables (exporter_address, exporter_name, buyer_name, buyer_country,
+    amount_usd, maturity_date, doc_hash, doc_filename, iec_code, commodity, status,
+    attestation_count, token_asset_code, discount_bps)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'settled', 2, ?, 400)
+`).run(
+  EXPORTER_2, 'Kerala Seafood Cooperative',
+  'Sysco Corporation', 'United States',
+  30000, '2026-06-30',
+  fakeHash('r5-bill-of-lading-dried-fish-sysco-usa'),
+  'BL-2026-KCHI-0008.pdf', '0923456789', 'Dried Fish',
+  `ML${String(0).padStart(4, '0')}5`
+);
+db.prepare(`INSERT OR IGNORE INTO attestations (receivable_id, attestor_address, attestor_role) VALUES (?, ?, 'logistics')`).run(r5.lastInsertRowid, ATTESTOR_LOGISTICS);
+db.prepare(`INSERT OR IGNORE INTO attestations (receivable_id, attestor_address, attestor_role) VALUES (?, ?, 'export_council')`).run(r5.lastInsertRowid, ATTESTOR_COUNCIL);
+db.prepare(`INSERT INTO investments (receivable_id, investor_address, share_cents, payment_cents, tx_hash) VALUES (?, ?, ?, ?, ?)`).run(
+  r5.lastInsertRowid, INVESTOR_1, 1800000, 1728000, 'demoTx' + fakeHash('inv-r5-inv1').slice(0,12)
+);
+db.prepare(`INSERT INTO investments (receivable_id, investor_address, share_cents, payment_cents, tx_hash) VALUES (?, ?, ?, ?, ?)`).run(
+  r5.lastInsertRowid, INVESTOR_2, 1200000, 1152000, 'demoTx' + fakeHash('inv-r5-inv2').slice(0,12)
+);
+// Oracle events for the settled flow
+db.prepare(`INSERT INTO oracle_events (receivable_id, event_type, amount_cents, proof, triggered_by) VALUES (?, 'payment_confirmed', 3000000, 'SWIFT:MT103:SYC-2026-0630', 'oracle')`).run(r5.lastInsertRowid);
+db.prepare(`INSERT INTO oracle_events (receivable_id, event_type, amount_cents, proof, triggered_by) VALUES (?, 'distributed', 3000000, 'auto', 'oracle')`).run(r5.lastInsertRowid);
+console.log(`  ✓ Created receivable #${r5.lastInsertRowid}: Dried Fish $30,000 [SETTLED — full lifecycle demo]`);
+
+// ── KYC Sessions ──────────────────────────────────────────────
+db.prepare(`INSERT OR IGNORE INTO kyc_sessions (id, wallet_address, name, email, status) VALUES (?, ?, ?, ?, 'approved')`).run(
+  'demo-kyc-nri-dubai', INVESTOR_1, 'Rajesh Kumar Menon', 'rajesh@kerala-diaspora.ae'
+);
+db.prepare(`INSERT OR IGNORE INTO kyc_sessions (id, wallet_address, name, email, status) VALUES (?, ?, ?, ?, 'pending')`).run(
+  'demo-kyc-local-angel', INVESTOR_2, 'Priya Nair', 'priya.nair@gmail.com'
+);
+console.log('  ✓ Created 2 KYC sessions (1 approved, 1 pending)');
+
+// ── Summary ───────────────────────────────────────────────────
+console.log('');
+const summary = db.prepare('SELECT status, COUNT(*) as c FROM receivables GROUP BY status').all();
+console.log('📊 Database Summary:');
+summary.forEach((s) => console.log(`   ${s.status}: ${s.c} receivable(s)`));
+console.log('');
+console.log('✅ Demo seed complete! Open http://localhost:5173/admin to see all receivables.');
+console.log('');
+console.log('Demo flow for judges:');
+console.log('  1. Admin panel → Attest receivable #1 (click logistics + export_council)');
+console.log('  2. Admin panel → List receivable #3 for sale');
+console.log('  3. Investor tab → Buy a share of receivable #4 (Ginger & Turmeric)');
+console.log('  4. Admin panel → Approve pending KYC session');
+console.log('  5. Admin panel → Confirm Payment on receivable #4 → Distribute');
