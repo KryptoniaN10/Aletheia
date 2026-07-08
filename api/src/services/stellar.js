@@ -305,4 +305,40 @@ export async function executeClawback(asset, fromPublicKey, amount) {
   return result.hash;
 }
 
+// ── DEX listing (secondary market) ───────────────────────────
+
+/**
+ * Create a ManageSellOffer so a token holder can exit before maturity.
+ * Returns the tx hash if ISSUER_SECRET_KEY is set, otherwise throws.
+ * In production: return an unsigned XDR for the seller (Freighter) to sign.
+ */
+export async function createDexListing({ sellerAddress, assetCode, assetIssuer, amount, priceUsdc }) {
+  const issuerKp = getIssuerKeypair();
+  const issuerAccount = await loadAccount(issuerKp.publicKey());
+
+  const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
+  const sellingAsset = new Asset(assetCode, assetIssuer || issuerKp.publicKey());
+  const buyingAsset  = new Asset('USDC', USDC_ISSUER);
+
+  const tx = new TransactionBuilder(issuerAccount, {
+    fee: BASE_FEE,
+    networkPassphrase: PASSPHRASE,
+  })
+    .addOperation(
+      Operation.manageSellOffer({
+        selling: sellingAsset,
+        buying:  buyingAsset,
+        amount:  amount.toString(),
+        price:   priceUsdc.toString(),
+        source:  sellerAddress,
+      })
+    )
+    .setTimeout(30)
+    .build();
+
+  tx.sign(issuerKp);
+  const result = await horizonServer.submitTransaction(tx);
+  return { hash: result.hash };
+}
+
 export { horizonServer, rpcServer, PASSPHRASE };

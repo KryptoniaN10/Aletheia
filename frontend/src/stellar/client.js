@@ -144,7 +144,13 @@ export const oracleApi = {
 
 export const stellarApi = {
   getAccount: (address) => apiCall(`/api/stellar/account/${address}`),
-  getOffers: (address) => apiCall(`/api/stellar/dex/offers/${address}`),
+  getOffers:  (address) => apiCall(`/api/stellar/dex/offers/${address}`),
+  getOrderbook: (params) => {
+    const qs = new URLSearchParams(params).toString();
+    return apiCall(`/api/stellar/dex/orderbook?${qs}`);
+  },
+  createDexListing: (body) => apiCall('/api/stellar/dex/list', 'POST', body),
+  sponsorTrustline: (body) => apiCall('/api/stellar/sponsor-trustline', 'POST', body),
 };
 
 // ── Utilities ─────────────────────────────────────────────────

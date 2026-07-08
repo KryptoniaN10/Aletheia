@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import DocumentUpload from '../components/DocumentUpload.jsx';
-import { AttestationMini } from '../components/ReceivableCard.jsx';
-import { receivablesApi, formatUsd } from '../stellar/client.js';
+import { AttestationMini, StatusBadge } from '../components/ReceivableCard.jsx';
+import { useReceivables } from '../hooks/useReceivables.js';
+import { receivablesApi, formatUsd, daysUntil } from '../stellar/client.js';
+
 
 const COMMODITIES = [
   'Black Pepper', 'Cardamom', 'Ginger', 'Turmeric', 'Cloves', 'Nutmeg',
@@ -26,18 +28,11 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [submitted, setSubmitted] = useState(null);
-  const [myReceivables, setMyReceivables] = useState([]);
-  const [loadingList, setLoadingList] = useState(false);
 
-  // Load exporter's receivables
-  useEffect(() => {
-    if (!walletAddress) return;
-    setLoadingList(true);
-    receivablesApi.list({ exporter: walletAddress })
-      .then(setMyReceivables)
-      .catch(() => {})
-      .finally(() => setLoadingList(false));
-  }, [walletAddress, submitted]);
+  // Auto-refreshing receivables list filtered to this exporter
+  const params = walletAddress ? { exporter: walletAddress } : null;
+  const { receivables: myReceivables, loading: loadingList, refresh: refreshList } =
+    useReceivables(params || {}, walletAddress ? 10000 : 0);
 
   function updateForm(key, val) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -64,6 +59,7 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
         exporter_name: '', buyer_name: '', buyer_country: '',
         amount_usd: '', maturity_date: '', iec_code: '', commodity: 'Black Pepper',
       });
+      refreshList();
     } catch (err) {
       setError(err.message);
     }
