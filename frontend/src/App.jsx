@@ -148,7 +148,7 @@ export default function App() {
               <ol className="text-ui-sm" style={{ paddingLeft: 18, margin: 0, lineHeight: 1.8 }}>
                 <li>Copy the current website URL:<br />
                   <span className="monospace text-accent" style={{ fontSize: '0.8rem', wordBreak: 'break-all' }}>
-                    http://10.203.224.197:5173/
+                    {window.location.origin}/
                   </span>
                 </li>
                 <li>Open the <strong>Freighter Mobile App</strong> on your phone.</li>
@@ -162,7 +162,7 @@ export default function App() {
               <button
                 className="btn btn-primary btn-full btn-sm"
                 onClick={() => {
-                  navigator.clipboard.writeText("http://10.203.224.197:5173/").catch(() => {});
+                  navigator.clipboard.writeText(window.location.origin + "/").catch(() => {});
                   alert("URL copied!");
                 }}
               >
