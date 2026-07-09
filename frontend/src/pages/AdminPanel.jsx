@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { receivablesApi, authApi, oracleApi, formatUsd } from '../stellar/client.js';
+
 import { StatusBadge } from '../components/ReceivableCard.jsx';
 import { AttestationMini } from '../components/ReceivableCard.jsx';
 import LiveFeed from '../components/LiveFeed.jsx';
@@ -20,8 +21,9 @@ export default function AdminPanel({ walletAddress }) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState({});
   const [actionResults, setActionResults] = useState({});
+  const [resetting, setResetting] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const [recs, sessions, events] = await Promise.all([
       receivablesApi.list().catch(() => []),
@@ -32,14 +34,26 @@ export default function AdminPanel({ walletAddress }) {
     setKycSessions(sessions);
     setOracleEvents(events);
     setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-  // Auto-refresh every 10s
-  useEffect(() => {
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+  // Auto-refresh every 8s
+  useEffect(() => {
+    const interval = setInterval(load, 8000);
+    return () => clearInterval(interval);
+  }, [load]);
+
+  async function handleResetDemo() {
+    if (!window.confirm('Reset demo data? This will wipe all current receivables and re-seed 5 demo receivables.')) return;
+    setResetting(true);
+    try {
+      await receivablesApi.resetDemo();
+      await load();
+    } catch (err) {
+      alert(`Reset failed: ${err.message}`);
+    }
+    setResetting(false);
+  }
 
   async function runAction(key, fn) {
     setActionLoading((s) => ({ ...s, [key]: true }));
@@ -77,8 +91,19 @@ export default function AdminPanel({ walletAddress }) {
           </h1>
           <p className="text-secondary text-ui-lg">
             Attest receivables, approve KYC, confirm payments, and trigger pro-rata distribution.
-            All actions are on-chain (or queued for testnet deployment).
+            All actions are on-chain (or demo mode without keys).
           </p>
+          <div className="flex gap-2" style={{ marginTop: 'var(--space-4)' }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={handleResetDemo}
+              disabled={resetting}
+              id="admin-reset-demo-btn"
+              style={{ borderColor: 'var(--color-saffron)', color: 'var(--color-saffron)' }}
+            >
+              {resetting ? '⏳ Resetting...' : '🔄 Reset Demo Data'}
+            </button>
+          </div>
         </div>
 
         {/* ── Stats row ────────────────────────────────────────── */}
@@ -87,7 +112,7 @@ export default function AdminPanel({ walletAddress }) {
             { label: 'Total Receivables', value: receivables.length, color: 'var(--color-teal-light)' },
             { label: 'Pending Attestation', value: receivables.filter((r) => r.status === 'pending').length, color: 'var(--color-saffron)' },
             { label: 'Active for Sale', value: receivables.filter((r) => r.status === 'active').length, color: 'var(--color-green-light)' },
-            { label: 'Pending KYC', value: kycSessions.filter((k) => k.status === 'pending').length, color: '#f08080' },
+            { label: 'Awaiting Payout', value: receivables.filter((r) => r.status === 'settled_pending').length, color: '#8fa8ff' },
           ].map((s) => (
             <div key={s.label} className="card stat-card">
               <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
@@ -226,12 +251,22 @@ export default function AdminPanel({ walletAddress }) {
                   <div className="animate-fade-in">
                     <LiveFeed walletAddress={walletAddress} />
                     <div className="flex flex-col gap-3" style={{ marginTop: 'var(--space-5)' }}>
+                      {oracleEvents.length === 0 && (
+                        <div className="card" style={{ textAlign: 'center', padding: 'var(--space-5)' }}>
+                          <div className="text-muted text-ui-sm">No oracle events yet. Run the demo flow!</div>
+                        </div>
+                      )}
                       {oracleEvents.map((event) => (
                         <div key={event.id} className="card" style={{ padding: 'var(--space-3)' }}>
                           <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-ui-sm" style={{ fontWeight: 700 }}>
-                                {event.event_type} · Receivable #{event.receivable_id}
+                            <div style={{ flex: 1 }}>
+                              <div className="flex items-center gap-2" style={{ marginBottom: 2 }}>
+                                <span className="text-ui-sm" style={{ fontWeight: 700 }}>
+                                  {event.event_type}
+                                </span>
+                                <span className="badge badge-pending" style={{ fontSize: '0.6rem' }}>
+                                  Receivable #{event.receivable_id}
+                                </span>
                               </div>
                               {event.amount_cents && (
                                 <div className="text-ui-xs text-muted">
@@ -239,13 +274,25 @@ export default function AdminPanel({ walletAddress }) {
                                 </div>
                               )}
                               {event.proof && (
-                                <div className="monospace text-ui-xs text-muted truncate" style={{ maxWidth: 300 }}>
+                                <div className="monospace text-ui-xs text-muted truncate" style={{ maxWidth: 320 }}>
                                   {event.proof}
                                 </div>
                               )}
+                              {/* Stellar Expert link if we have a real tx hash */}
+                              {event.proof && event.proof.length === 64 && !event.proof.startsWith('demo') && (
+                                <a
+                                  href={`https://stellar.expert/explorer/testnet/tx/${event.proof}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-ui-xs"
+                                  style={{ color: 'var(--color-teal-light)', textDecoration: 'underline' }}
+                                >
+                                  View on Stellar Expert ↗
+                                </a>
+                              )}
                             </div>
-                            <div className="text-ui-xs text-muted">
-                              {new Date(event.occurred_at).toLocaleString()}
+                            <div className="text-ui-xs text-muted" style={{ marginLeft: 'var(--space-3)', flexShrink: 0 }}>
+                              {new Date(event.occurred_at).toLocaleTimeString()}
                             </div>
                           </div>
                         </div>
@@ -390,17 +437,33 @@ function AdminReceivableRow({
 
         {/* SETTLED_PENDING: Distribute */}
         {rec.status === 'settled_pending' && (
-          <button
-            className="btn btn-primary"
-            onClick={onDistribute}
-            disabled={actionLoading[`distribute-${rec.id}`]}
-            id={`distribute-${rec.id}-btn`}
-            style={{ width: '100%' }}
-          >
-            {actionLoading[`distribute-${rec.id}`]
-              ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Distributing...</>
-              : '🎉 Distribute Pro-rata Payout'}
-          </button>
+          <div>
+            <div className="alert" style={{
+              background: 'rgba(143,168,255,0.1)',
+              border: '1px solid rgba(143,168,255,0.3)',
+              borderRadius: 'var(--radius-md)',
+              padding: '8px 12px',
+              marginBottom: 'var(--space-3)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className="spinner" style={{ width: 14, height: 14 }} />
+                <span className="text-ui-xs" style={{ color: '#8fa8ff' }}>
+                  Payment confirmed — awaiting pro-rata distribution to {(rec.investments || []).length} investor(s)
+                </span>
+              </div>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={onDistribute}
+              disabled={actionLoading[`distribute-${rec.id}`]}
+              id={`distribute-${rec.id}-btn`}
+              style={{ width: '100%' }}
+            >
+              {actionLoading[`distribute-${rec.id}`]
+                ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Distributing...</>
+                : '🎉 Distribute Pro-rata Payout'}
+            </button>
+          </div>
         )}
 
         {/* Emergency clawback (any non-settled state) */}
@@ -452,12 +515,26 @@ function AdminReceivableRow({
 
 function ActionFeedback({ result }) {
   if (!result) return null;
+  const url = result.data?.stellar_expert_url;
   return (
     <div className={`alert ${result.ok ? 'alert-success' : 'alert-error'} animate-fade-in`}
       style={{ padding: '8px 12px' }}>
-      <span className="text-ui-xs">
-        {result.ok ? `✓ ${result.data?.message || 'Success'}` : `✗ ${result.error}`}
-      </span>
+      <div>
+        <div className="text-ui-xs">
+          {result.ok ? `✓ ${result.data?.message || 'Success'}` : `✗ ${result.error}`}
+        </div>
+        {url && (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ui-xs"
+            style={{ color: 'var(--color-teal-light)', textDecoration: 'underline', display: 'block', marginTop: 4 }}
+          >
+            View on Stellar Expert ↗
+          </a>
+        )}
+      </div>
     </div>
   );
 }

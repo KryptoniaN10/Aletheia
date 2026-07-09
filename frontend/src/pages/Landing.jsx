@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { platformApi } from '../stellar/client.js';
 
 // ── SVG Decorations ────────────────────────────────────────────
 function SpiceParticle({ style }) {
@@ -16,6 +17,12 @@ function SpiceParticle({ style }) {
 
 export default function Landing({ walletAddress, onConnect }) {
   const heroRef = useRef(null);
+  const [liveStats, setLiveStats] = useState(null);
+
+  // Fetch live platform stats
+  useEffect(() => {
+    platformApi.getStats().then(setLiveStats).catch(() => {});
+  }, []);
 
   // Parallax on mouse move
   useEffect(() => {
@@ -35,12 +42,24 @@ export default function Landing({ walletAddress, onConnect }) {
     return () => window.removeEventListener('mousemove', handle);
   }, []);
 
+  const fmtUsd = (n) => n >= 1000000
+    ? `$${(n / 1000000).toFixed(1)}M`
+    : n >= 1000 ? `$${(n / 1000).toFixed(0)}K` : `$${n}`;
+
   const STATS = [
     { value: '$2T+', label: 'Global Trade Finance Gap' },
     { value: '60–90', label: 'Days Exporters Wait' },
     { value: '5s', label: 'Stellar Settlement Time' },
     { value: '<$0.01', label: 'Per Transaction' },
   ];
+
+  // Live platform stats row (shown below the problem stats)
+  const LIVE_STATS = liveStats ? [
+    { value: String(liveStats.total_receivables || 0), label: 'Receivables Tokenized', live: true },
+    { value: fmtUsd(liveStats.total_volume_usd || 0), label: 'Total Volume', live: true },
+    { value: String(liveStats.exporter_count || 0), label: 'Exporters Onboarded', live: true },
+    { value: String(liveStats.investor_count || 0), label: 'Active Investors', live: true },
+  ] : null;
 
   const HOW_IT_WORKS = [
     {
@@ -211,6 +230,42 @@ export default function Landing({ walletAddress, onConnect }) {
           </div>
         </div>
       </section>
+
+      {/* ── Live Platform Stats ───────────────────────────────── */}
+      {LIVE_STATS && (
+        <section style={{
+          background: 'rgba(0,201,167,0.05)',
+          borderTop: '1px solid rgba(0,201,167,0.15)',
+          borderBottom: '1px solid rgba(0,201,167,0.15)',
+          padding: 'var(--space-5) 0',
+        }}>
+          <div className="container">
+            <div className="flex items-center gap-3" style={{ marginBottom: 'var(--space-3)' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-teal-light)', animation: 'pulse 2s infinite' }} />
+              <span className="text-ui-xs" style={{ color: 'var(--color-teal-light)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>
+                Live Platform Stats
+              </span>
+            </div>
+            <div className="grid-4">
+              {LIVE_STATS.map((s) => (
+                <div key={s.label} className="card" style={{ padding: 'var(--space-4)', textAlign: 'center' }}>
+                  <div style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '1.8rem',
+                    fontWeight: 700,
+                    color: 'var(--color-teal-light)',
+                    lineHeight: 1,
+                    marginBottom: 4,
+                  }}>
+                    {s.value}
+                  </div>
+                  <div className="text-ui-xs text-muted">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── How it works ──────────────────────────────────────── */}
       <section style={{ padding: 'var(--space-9) 0', background: 'var(--color-bg-base)' }}>

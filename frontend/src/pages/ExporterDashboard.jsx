@@ -316,18 +316,56 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
 
             {/* ── Success Banner ─────────────────────────────────── */}
             {submitted && (
-              <div className="alert alert-success animate-fade-in" style={{ marginTop: 'var(--space-4)' }}>
-                <div>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                    ✓ Receivable registered! ID #{submitted.id}
-                  </div>
+              <div className="card animate-fade-in" style={{
+                marginTop: 'var(--space-4)',
+                border: '1px solid rgba(0,201,167,0.4)',
+                background: 'rgba(0,201,167,0.06)',
+                padding: 'var(--space-5)',
+              }}>
+                <div style={{ fontSize: '2rem', marginBottom: 'var(--space-3)' }}>🎉</div>
+                <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: 'var(--space-3)', color: 'var(--color-teal-light)' }}>
+                  Receivable #{submitted.id} Registered!
+                </div>
+
+                <div style={{
+                  background: 'rgba(0,0,0,0.2)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-4)',
+                  marginBottom: 'var(--space-4)',
+                  fontFamily: 'monospace',
+                }}>
+                  {[['ID', `#${submitted.id}`], ['Chain ID', submitted.chain_id || 'Pending (demo mode)'], ['Doc Hash', submitted.doc_hash ? `${submitted.doc_hash.slice(0, 16)}…${submitted.doc_hash.slice(-8)}` : '—'], ['IPFS CID', submitted.ipfs_cid || 'Pending upload']].map(([l, v]) => (
+                    <div key={l} className="flex items-center justify-between" style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <span className="text-ui-xs text-muted">{l}</span>
+                      <span className="text-ui-xs" style={{ color: 'var(--color-teal-light)' }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="alert alert-info" style={{ marginBottom: 'var(--space-4)', padding: '10px 14px' }}>
                   <div className="text-ui-sm">
-                    Doc hash: <span className="monospace">{submitted.doc_hash?.slice(0, 20)}…</span>
-                    {submitted.ipfs_cid && <> · IPFS: <span className="monospace">{submitted.ipfs_cid}</span></>}
+                    📋 <strong>Next Step:</strong> Share your receivable hash with 2 of 3 attestors:<br />
+                    <span className="text-ui-xs" style={{ opacity: 0.8 }}>Logistics Partner · Export Council · NBFC</span>
                   </div>
-                  <div className="text-ui-sm" style={{ marginTop: 4 }}>
-                    Awaiting 2-of-3 attestations. The attestation dashboard is in the Admin panel.
-                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => {
+                      const text = `Malabar Ledger Receivable #${submitted.id}\nDoc Hash: ${submitted.doc_hash}\nAmount: $${submitted.amount_usd?.toLocaleString()}\nRequest your attestation via the Admin panel.`;
+                      navigator.clipboard.writeText(text).catch(() => {});
+                    }}
+                    id="copy-attestation-request-btn"
+                  >
+                    📋 Copy Attestation Request
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setSubmitted(null)}
+                  >
+                    Dismiss
+                  </button>
                 </div>
               </div>
             )}
@@ -338,9 +376,7 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
             <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-4)' }}>
               <h3 style={{ fontFamily: 'var(--font-display)' }}>My Receivables</h3>
               {walletAddress && (
-                <button className="btn btn-ghost btn-sm" onClick={() =>
-                  receivablesApi.list({ exporter: walletAddress }).then(setMyReceivables)
-                } id="refresh-receivables-btn">
+                <button className="btn btn-ghost btn-sm" onClick={refreshList} id="refresh-receivables-btn">
                   ↻ Refresh
                 </button>
               )}

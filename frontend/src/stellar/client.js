@@ -49,6 +49,52 @@ export async function getFreighterPublicKey() {
   }
 }
 
+// ── Sign a USDC payment XDR with Freighter ─────────────────────
+// Builds a minimal Stellar transaction representing the USDC payment
+// for a receivable share purchase, asks Freighter to sign it,
+// then submits to Horizon. Returns { hash } on success.
+// The escrow destination is the API issuer (production: a smart contract).
+export async function signTransactionWithFreighter({ investorAddress, paymentUsd, receivableId }) {
+  const { signTransaction } = await import('@stellar/freighter-api');
+  const { TransactionBuilder, BASE_FEE, Networks } = await import('@stellar/stellar-sdk');
+
+  const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
+  const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_ADDRESS || investorAddress; // fallback to self in demo
+
+  // Load investor account from Horizon
+  const account = await horizonServer.loadAccount(investorAddress);
+  const usdcAsset = new Asset('USDC', USDC_ISSUER);
+
+  const tx = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
+  })
+    .addOperation(
+      (await import('@stellar/stellar-sdk')).Operation.payment({
+        destination: ESCROW_ADDRESS,
+        asset: usdcAsset,
+        amount: paymentUsd.toFixed(7),
+      })
+    )
+    .addMemo((await import('@stellar/stellar-sdk')).Memo.text(`ML-REC-${receivableId}`))
+    .setTimeout(180)
+    .build();
+
+  const txXdr = tx.toXDR();
+
+  // Ask Freighter to sign
+  const signed = await signTransaction(txXdr, {
+    networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
+  });
+  if (signed.error) throw new Error(signed.error);
+
+  // Submit signed transaction to Horizon
+  const { TransactionBuilder: TB } = await import('@stellar/stellar-sdk');
+  const signedTx = TB.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
+  const result = await horizonServer.submitTransaction(signedTx);
+  return { hash: result.hash };
+}
+
 // ── Horizon queries ───────────────────────────────────────────
 
 export async function getAccountBalances(publicKey) {
@@ -115,6 +161,9 @@ export const receivablesApi = {
 
   buyShare: (id, body) =>
     apiCall(`/api/receivables/${id}/buy-share`, 'POST', body),
+
+  resetDemo: () =>
+    apiCall('/api/receivables/reset-demo', 'POST'),
 };
 
 // ── KYC / Auth API ────────────────────────────────────────────
@@ -151,6 +200,11 @@ export const stellarApi = {
   },
   createDexListing: (body) => apiCall('/api/stellar/dex/list', 'POST', body),
   sponsorTrustline: (body) => apiCall('/api/stellar/sponsor-trustline', 'POST', body),
+};
+
+// ── Platform stats API ────────────────────────────────────────
+export const platformApi = {
+  getStats: () => apiCall('/api/stats'),
 };
 
 // ── Utilities ─────────────────────────────────────────────────

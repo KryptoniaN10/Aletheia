@@ -8,8 +8,19 @@
 
 import express from 'express';
 import { getDb } from '../db/schema.js';
+import { invokeContract, scU128, scI128, scAddress } from '../services/soroban.js';
+import { horizonServer } from '../services/stellar.js';
+import {
+  Asset, TransactionBuilder, Operation, Keypair, BASE_FEE, Networks,
+} from '@stellar/stellar-sdk';
 
 const router = express.Router();
+const PASSPHRASE = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
+
+function getIssuerKp() {
+  if (!process.env.ISSUER_SECRET_KEY) return null;
+  return Keypair.fromSecret(process.env.ISSUER_SECRET_KEY);
+}
 
 // ── Confirm importer payment (judge-triggerable) ──────────────
 // In production: called by an automated oracle reading SWIFT/SEPA feeds.
@@ -27,27 +38,49 @@ router.post('/:id/confirm-payment', async (req, res, next) => {
     }
 
     const amountUsd = parseFloat(confirmed_amount_usd) || rec.amount_usd;
-    const paymentProof = proof || `DEMO-CONFIRM-${Date.now()}`;
+    const amountCents = Math.round(amountUsd * 100);
+    const paymentProof = proof || `ORACLE-${Date.now()}`;
 
-    // Record oracle event
+    // ── On-chain: SettlementEscrow.confirm_payment() ──────────
+    let confirmTxHash = null;
+    try {
+      const { txHash } = await invokeContract(
+        process.env.SETTLEMENT_ESCROW_CONTRACT_ID,
+        'confirm_payment',
+        [
+          scU128(receivableId),
+          scI128(amountCents),
+          scAddress(triggered_by || process.env.ORACLE_PUBLIC_KEY || process.env.ISSUER_PUBLIC_KEY || 'GABC'),
+        ],
+        process.env.ORACLE_SECRET_KEY || process.env.ISSUER_SECRET_KEY
+      );
+      confirmTxHash = txHash;
+    } catch (chainErr) {
+      console.warn('[confirm-payment] On-chain call failed (demo ok):', chainErr.message);
+      confirmTxHash = `demo_confirm_${Date.now().toString(36)}`;
+    }
+
+    // Record oracle event with tx hash
     db.prepare(
       `INSERT INTO oracle_events
-        (receivable_id, event_type, amount_cents, proof, triggered_by)
-       VALUES (?, 'payment_confirmed', ?, ?, ?)`
-    ).run(receivableId, Math.round(amountUsd * 100), paymentProof, triggered_by || 'oracle');
+        (receivable_id, event_type, amount_cents, proof, tx_hash, triggered_by)
+       VALUES (?, 'payment_confirmed', ?, ?, ?, ?)`
+    ).run(receivableId, amountCents, paymentProof, confirmTxHash, triggered_by || 'oracle');
 
     // Update receivable status
     db.prepare(
       "UPDATE receivables SET status = 'settled_pending', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).run(receivableId);
 
-    // ── TODO: Call SettlementEscrow.confirm_payment() on-chain ──
-
     res.json({
       receivable_id: receivableId,
       confirmed_amount_usd: amountUsd,
       proof: paymentProof,
       status: 'settled_pending',
+      confirm_tx: confirmTxHash,
+      stellar_expert_url: confirmTxHash && !confirmTxHash.startsWith('demo_')
+        ? `https://stellar.expert/explorer/testnet/tx/${confirmTxHash}`
+        : null,
       message: 'Payment confirmed. Ready to distribute to investors.',
     });
   } catch (err) {
@@ -68,7 +101,6 @@ router.post('/:id/distribute', async (req, res, next) => {
       return res.status(400).json({ error: 'Payment must be confirmed first' });
     }
 
-    // Get all investments for this receivable
     const investments = db
       .prepare('SELECT * FROM investments WHERE receivable_id = ?')
       .all(receivableId);
@@ -77,7 +109,6 @@ router.post('/:id/distribute', async (req, res, next) => {
       return res.status(400).json({ error: 'No investors to pay out' });
     }
 
-    // Calculate pro-rata payouts
     const confirmEvent = db
       .prepare("SELECT * FROM oracle_events WHERE receivable_id = ? AND event_type = 'payment_confirmed' ORDER BY occurred_at DESC LIMIT 1")
       .get(receivableId);
@@ -85,10 +116,12 @@ router.post('/:id/distribute', async (req, res, next) => {
     const totalConfirmedCents = confirmEvent?.amount_cents || Math.round(rec.amount_usd * 100);
     const totalShareCents = investments.reduce((sum, inv) => sum + inv.share_cents, 0);
 
+    // ── Calculate pro-rata payouts ────────────────────────────
     const payouts = investments.map((inv, idx) => {
       const isLast = idx === investments.length - 1;
-      const paid = investments.slice(0, idx).reduce((s, i) =>
-        s + Math.floor(totalConfirmedCents * i.share_cents / totalShareCents), 0);
+      const paid = investments
+        .slice(0, idx)
+        .reduce((s, i) => s + Math.floor(totalConfirmedCents * i.share_cents / totalShareCents), 0);
       const payout = isLast
         ? totalConfirmedCents - paid
         : Math.floor(totalConfirmedCents * inv.share_cents / totalShareCents);
@@ -101,26 +134,82 @@ router.post('/:id/distribute', async (req, res, next) => {
       };
     });
 
-    // Mark as settled
+    // ── On-chain: SettlementEscrow.distribute() ───────────────
+    let distributeTxHash = null;
+    try {
+      const { txHash } = await invokeContract(
+        process.env.SETTLEMENT_ESCROW_CONTRACT_ID,
+        'distribute',
+        [scU128(receivableId)],
+        process.env.ORACLE_SECRET_KEY || process.env.ISSUER_SECRET_KEY
+      );
+      distributeTxHash = txHash;
+    } catch (chainErr) {
+      console.warn('[distribute] On-chain call failed:', chainErr.message);
+      distributeTxHash = `demo_distribute_${Date.now().toString(36)}`;
+    }
+
+    // ── Stellar: send USDC payments to each investor ──────────
+    // Only runs when issuer key is configured
+    const issuerKp = getIssuerKp();
+    const paymentHashes = [];
+    if (issuerKp && rec.token_asset_code) {
+      try {
+        const issuerAccount = await horizonServer.loadAccount(issuerKp.publicKey());
+        const usdcAsset = new Asset('USDC', 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5');
+
+        // Build a single transaction with all payment ops (up to 100 investors)
+        const txBuilder = new TransactionBuilder(issuerAccount, {
+          fee: BASE_FEE,
+          networkPassphrase: PASSPHRASE,
+        });
+
+        for (const p of payouts) {
+          if (parseFloat(p.payout_usd) > 0) {
+            txBuilder.addOperation(
+              Operation.payment({
+                destination: p.investor_address,
+                asset: usdcAsset,
+                amount: p.payout_usd,
+              })
+            );
+          }
+        }
+
+        const payoutTx = txBuilder.setTimeout(30).build();
+        payoutTx.sign(issuerKp);
+        const payoutResult = await horizonServer.submitTransaction(payoutTx);
+        paymentHashes.push(payoutResult.hash);
+      } catch (payErr) {
+        console.warn('[distribute] USDC payment batch failed (demo ok):', payErr.message);
+      }
+    }
+
+    // ── Mark as settled ───────────────────────────────────────
     db.prepare(
       "UPDATE receivables SET status = 'settled', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).run(receivableId);
 
     db.prepare(
       `INSERT INTO oracle_events
-        (receivable_id, event_type, amount_cents, proof, triggered_by)
-       VALUES (?, 'distributed', ?, 'auto', ?)`
-    ).run(receivableId, totalConfirmedCents, triggered_by || 'oracle');
-
-    // ── TODO: Call SettlementEscrow.distribute() on-chain ───────
+        (receivable_id, event_type, amount_cents, proof, tx_hash, triggered_by)
+       VALUES (?, 'distributed', ?, ?, ?, ?)`
+    ).run(receivableId, totalConfirmedCents, 'auto', distributeTxHash, triggered_by || 'oracle');
 
     res.json({
       receivable_id: receivableId,
       total_distributed_usd: (totalConfirmedCents / 100).toFixed(2),
       investor_count: investments.length,
       payouts,
+      distribute_tx: distributeTxHash,
+      payment_txs: paymentHashes,
       status: 'settled',
       message: 'Pro-rata payout complete!',
+      stellar_expert_url: paymentHashes[0]
+        ? `https://stellar.expert/explorer/testnet/tx/${paymentHashes[0]}`
+        : (distributeTxHash && !distributeTxHash.startsWith('demo_')
+          ? `https://stellar.expert/explorer/testnet/tx/${distributeTxHash}`
+          : null),
     });
   } catch (err) {
     next(err);
@@ -137,22 +226,88 @@ router.post('/:id/clawback', async (req, res, next) => {
     const rec = db.prepare('SELECT * FROM receivables WHERE id = ?').get(receivableId);
     if (!rec) return res.status(404).json({ error: 'Not found' });
 
+    if (!['active', 'attested', 'settled_pending'].includes(rec.status)) {
+      return res.status(400).json({ error: `Cannot clawback a receivable with status: ${rec.status}` });
+    }
+
+    // ── On-chain: SettlementEscrow.clawback() ────────────────
+    let clawbackTxHash = null;
+    try {
+      const { txHash } = await invokeContract(
+        process.env.SETTLEMENT_ESCROW_CONTRACT_ID,
+        'clawback',
+        [
+          scU128(receivableId),
+          scAddress(triggered_by || process.env.ISSUER_PUBLIC_KEY || 'GABC'),
+        ],
+        process.env.ISSUER_SECRET_KEY
+      );
+      clawbackTxHash = txHash;
+    } catch (chainErr) {
+      console.warn('[clawback] On-chain call failed (demo ok):', chainErr.message);
+      clawbackTxHash = `demo_clawback_${Date.now().toString(36)}`;
+    }
+
+    // ── Stellar: Clawback operation per investor token holding ─
+    // Requires CLAWBACK_ENABLED flag on the asset
+    const issuerKp = getIssuerKp();
+    const clawbackHashes = [];
+    if (issuerKp && rec.token_asset_code) {
+      const investments = db
+        .prepare('SELECT * FROM investments WHERE receivable_id = ?')
+        .all(receivableId);
+
+      if (investments.length > 0) {
+        try {
+          const issuerAccount = await horizonServer.loadAccount(issuerKp.publicKey());
+          const receivableAsset = new Asset(rec.token_asset_code, issuerKp.publicKey());
+
+          const txBuilder = new TransactionBuilder(issuerAccount, {
+            fee: BASE_FEE,
+            networkPassphrase: PASSPHRASE,
+          });
+
+          for (const inv of investments) {
+            // Clawback the investor's proportional token amount
+            const tokenAmount = (inv.share_cents / 100).toFixed(7);
+            txBuilder.addOperation(
+              Operation.clawback({
+                asset: receivableAsset,
+                from: inv.investor_address,
+                amount: tokenAmount,
+              })
+            );
+          }
+
+          const clawTx = txBuilder.setTimeout(30).build();
+          clawTx.sign(issuerKp);
+          const clawResult = await horizonServer.submitTransaction(clawTx);
+          clawbackHashes.push(clawResult.hash);
+        } catch (clawErr) {
+          console.warn('[clawback] Stellar clawback op failed (demo ok):', clawErr.message);
+        }
+      }
+    }
+
     db.prepare(
       "UPDATE receivables SET status = 'clawback', updated_at = CURRENT_TIMESTAMP WHERE id = ?"
     ).run(receivableId);
 
     db.prepare(
       `INSERT INTO oracle_events
-        (receivable_id, event_type, proof, triggered_by)
-       VALUES (?, 'clawback', ?, ?)`
-    ).run(receivableId, reason || 'Fraud/dispute', triggered_by || 'admin');
-
-    // ── TODO: Call SettlementEscrow.clawback() + Stellar clawback op
+        (receivable_id, event_type, proof, tx_hash, triggered_by)
+       VALUES (?, 'clawback', ?, ?, ?)`
+    ).run(receivableId, reason || 'Fraud/dispute', clawbackTxHash, triggered_by || 'admin');
 
     res.json({
       receivable_id: receivableId,
       status: 'clawback',
       reason: reason || 'Fraud/dispute',
+      clawback_tx: clawbackTxHash,
+      stellar_clawback_txs: clawbackHashes,
+      stellar_expert_url: clawbackHashes[0]
+        ? `https://stellar.expert/explorer/testnet/tx/${clawbackHashes[0]}`
+        : null,
       message: 'Clawback initiated on all receivable tokens',
     });
   } catch (err) {

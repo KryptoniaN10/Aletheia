@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { receivablesApi, formatUsd, formatYield, daysUntil } from '../stellar/client.js';
+import { signTransactionWithFreighter } from '../stellar/client.js';
 
 // ── Share Purchase Modal ───────────────────────────────────────
 // Investor selects how much of a receivable to buy.
@@ -26,11 +27,31 @@ export default function SharePurchaseModal({ receivable, investorAddress, onClos
     setLoading(true);
     setError(null);
     try {
+      let txHash = null;
+
+      // ── Step 1: Sign USDC payment with Freighter ──────────────
+      // We attempt to sign an XDR representing the USDC payment.
+      // If Freighter isn't installed or signing is rejected, we
+      // fall back to recording the trade in demo mode.
+      try {
+        const signed = await signTransactionWithFreighter({
+          investorAddress,
+          paymentUsd,
+          receivableId: id,
+        });
+        if (signed?.hash) txHash = signed.hash;
+      } catch (freighterErr) {
+        // Non-fatal: log and continue in demo mode
+        console.warn('[SharePurchase] Freighter signing failed:', freighterErr.message);
+      }
+
+      // ── Step 2: Record the trade on the API ──────────────────
       const result = await receivablesApi.buyShare(id, {
         investor_address: investorAddress,
         share_usd: shareUsd,
+        tx_hash: txHash,
       });
-      setSuccess(result);
+      setSuccess({ ...result, txHash });
       onSuccess?.(result);
     } catch (err) {
       setError(err.message);
@@ -39,6 +60,10 @@ export default function SharePurchaseModal({ receivable, investorAddress, onClos
   }
 
   if (success) {
+    const explorerUrl = success.txHash && !success.txHash.startsWith('demo_')
+      ? `https://stellar.expert/explorer/testnet/tx/${success.txHash}`
+      : success.stellar_expert_url || null;
+
     return (
       <div className="modal-backdrop" onClick={onClose}>
         <div className="modal" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center' }}>
@@ -52,8 +77,23 @@ export default function SharePurchaseModal({ receivable, investorAddress, onClos
             Payout will occur when the importer's payment clears.
           </p>
           <div className="alert alert-success" style={{ marginBottom: 'var(--space-5)', textAlign: 'left' }}>
-            Receivable tokens will be transferred to your wallet once the issuer authorizes your trustline.
-            {apy && ` Estimated yield: ${apy}.`}
+            <div>Receivable tokens will be transferred to your wallet once the issuer authorizes your trustline.</div>
+            {apy && <div style={{ marginTop: 4 }}>Estimated yield: <strong>{apy}</strong></div>}
+            {explorerUrl && (
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'block', marginTop: 8, color: 'var(--color-teal-light)', fontSize: '0.75rem', textDecoration: 'underline' }}
+              >
+                View transaction on Stellar Expert ↗
+              </a>
+            )}
+            {!success.txHash && (
+              <div style={{ marginTop: 8, fontSize: '0.7rem', opacity: 0.6 }}>
+                Demo mode — install Freighter wallet for live on-chain transactions
+              </div>
+            )}
           </div>
           <button className="btn btn-primary btn-full" onClick={onClose} id="purchase-done-btn">
             Done
