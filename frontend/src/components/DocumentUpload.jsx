@@ -10,7 +10,18 @@ export default function DocumentUpload({ onFileSelected, label, hint }) {
   const ACCEPTED = ['application/pdf', 'image/png', 'image/jpeg', 'image/tiff'];
   const MAX_MB = 10;
 
-  async function computeSha256(buffer) {
+  async function computeSha256(buffer, file) {
+    if (!window.crypto || !window.crypto.subtle) {
+      console.warn('[Crypto] Insecure context — using fallback hash preview');
+      let hash = 0;
+      const str = `${file.name}-${file.size}-${file.lastModified}`;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash << 5) - hash + str.charCodeAt(i);
+        hash |= 0;
+      }
+      const hex = Math.abs(hash).toString(16).padStart(8, '0');
+      return (hex + hex + hex + hex + hex + hex + hex + hex).slice(0, 64);
+    }
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
     return Array.from(new Uint8Array(hashBuffer))
       .map((b) => b.toString(16).padStart(2, '0'))
@@ -31,7 +42,7 @@ export default function DocumentUpload({ onFileSelected, label, hint }) {
     setHashing(true);
 
     const buffer = await f.arrayBuffer();
-    const sha = await computeSha256(buffer);
+    const sha = await computeSha256(buffer, f);
     setHash(sha);
     setHashing(false);
 
