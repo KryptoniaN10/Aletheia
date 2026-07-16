@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  deploy-contracts.sh — Malabar Ledger Contract Deployment
+#  deploy-contracts.sh — Aletheia Contract Deployment
 #  Compiles all three Soroban contracts to WASM and deploys
 #  to testnet. Writes contract IDs back to .env.
 #
@@ -21,7 +21,7 @@ set -e
 NETWORK="testnet"
 CONTRACTS_DIR="contracts"
 
-echo "🦀 Malabar Ledger — Contract Deployment"
+echo "⚖️ Aletheia — Contract Deployment"
 echo "========================================"
 echo ""
 

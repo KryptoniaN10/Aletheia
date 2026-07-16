@@ -1,5 +1,5 @@
 // ============================================================
-//  seed-demo.js — Malabar Ledger Demo Data Seeder
+//  seed-demo.js — Aletheia Demo Data Seeder
 //  Populates the database with realistic Kerala export
 //  receivables at every stage of the lifecycle, so judges
 //  can experience the full flow immediately on first load.
@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '../malabar.db');
+const DB_PATH = path.join(__dirname, '../aletheia.db');
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
@@ -91,7 +91,7 @@ function fakeHash(seed) {
 }
 
 // ── Clear existing demo data ──────────────────────────────────
-console.log('🌊 Malabar Ledger — Demo Seeder');
+console.log('⚖️ Aletheia — Demo Seeder');
 console.log('================================');
 
 const existing = db.prepare('SELECT COUNT(*) as c FROM receivables').get();
@@ -105,7 +105,7 @@ const EXPORTER_1 = 'GDEMO1EXPORTER1KERALA1SPICES1KOZHIKODE1111111111111111111';
 const EXPORTER_2 = 'GDEMO2EXPORTER2KERALA2SEAFOOD2THRISSUR2222222222222222222';
 const INVESTOR_1 = 'GDEMO3INVESTOR1DIASPORA1NRI1DUBAI111111111111111111111111';
 const INVESTOR_2 = 'GDEMO4INVESTOR2LOCAL1CALICUT1ANGEL1111111111111111111111';
-const ATTESTOR_LOGISTICS = 'GDEMO5LOGISTICS1PARTNER1MALABAR1FREIGHT1111111111111111';
+const ATTESTOR_LOGISTICS = 'GDEMO5LOGISTICS1PARTNER1ALETHEIA1FREIGHT1111111111111111';
 const ATTESTOR_COUNCIL   = 'GDEMO6EXPORT1COUNCIL1SPICES1BOARD1KERALA111111111111111';
 const ATTESTOR_NBFC      = 'GDEMO7NBFC1KERALA1FINANCIAL1SERVICES1111111111111111111';
 

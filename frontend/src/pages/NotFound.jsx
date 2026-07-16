@@ -19,13 +19,13 @@ export default function NotFound() {
 
         <div className="section-label" style={{ marginBottom: 'var(--space-2)' }}>404 — Not Found</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', marginBottom: 'var(--space-4)', lineHeight: 1.1 }}>
-          Lost at sea,{' '}
-          <span className="shine">off the Malabar Coast</span>
+          Lost in transit,{' '}
+          <span className="shine">seeking the truth</span>
         </h1>
 
         <p className="text-secondary text-ui-lg" style={{ marginBottom: 'var(--space-7)', lineHeight: 1.7 }}>
           The page you're looking for doesn't exist or has been moved.
-          Even Vasco da Gama needed a guide — let us take you home.
+          Even the most seasoned voyager needs a guide to reveal the way — let us take you home.
         </p>
 
         <div className="flex gap-3" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>

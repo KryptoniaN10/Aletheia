@@ -30,7 +30,7 @@ export default function HowItWorks() {
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-7)' }}>
           <div className="section-label" style={{ color: 'var(--color-saffron)' }}>Operational Protocol</div>
           <h1 className="display-lg" style={{ marginBottom: 'var(--space-3)' }}>
-            The Mechanics of <span style={{ color: 'var(--color-teal)' }}>Malabar Ledger</span>
+            The Mechanics of <span style={{ color: 'var(--color-teal)' }}>Aletheia</span>
           </h1>
           <p className="text-secondary text-ui-lg">
             A secure bridge between real-world physical trade lanes and digital liquidity.
@@ -54,7 +54,7 @@ export default function HowItWorks() {
             <div>
               <h4 style={{ color: 'var(--color-saffron)', marginBottom: 'var(--space-2)' }}>A Legacy of Trust</h4>
               <p className="text-ui-sm text-secondary" style={{ lineHeight: 1.6 }}>
-                For centuries, the ports of the Malabar Coast connected local merchants to global markets using physical manifests and handwritten ledger books. Malabar Ledger digitizes this exact heritage of trust, replacing ink manifests with on-chain Soroban registry records and escrow accounts.
+                For centuries, the ports of the Malabar Coast connected local merchants to global markets using physical manifests and handwritten ledger books. Aletheia digitizes this exact heritage of trust, turning physical manifests and bills of lading into cryptographic proof on Stellar, revealing truth in trade and building trust in time.
               </p>
             </div>
           </div>

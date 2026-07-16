@@ -1,5 +1,5 @@
 // ============================================================
-//  Stellar client — Malabar Ledger Frontend
+//  Stellar client — Aletheia Frontend
 //  Wraps Stellar SDK operations and provides a simulation layer
 //  that mirrors the exact contract API surface. When real
 //  contract IDs are deployed, swap the simulation calls for

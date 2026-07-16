@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  setup-testnet.sh — Malabar Ledger Testnet Setup
+#  setup-testnet.sh — Aletheia Testnet Setup
 #  Creates and funds all required accounts, sets asset flags,
 #  and configures initial trustlines.
 #
@@ -19,7 +19,7 @@ set -e
 NETWORK="testnet"
 HORIZON="https://horizon-testnet.stellar.org"
 
-echo "🌊 Malabar Ledger — Testnet Setup"
+echo "⚖️ Aletheia — Testnet Setup"
 echo "=================================="
 echo ""
 
@@ -112,7 +112,7 @@ FRACTIONAL_SALE_CONTRACT_ID=
 SETTLEMENT_ESCROW_CONTRACT_ID=
 
 PORT=3001
-DATABASE_URL=./malabar.db
+DATABASE_URL=./aletheia.db
 
 # Add your Pinata keys for IPFS (optional — falls back to hash-only mode)
 PINATA_API_KEY=

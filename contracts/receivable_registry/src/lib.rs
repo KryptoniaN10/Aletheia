@@ -1,5 +1,5 @@
 // ============================================================
-//  ReceivableRegistry — Malabar Ledger
+//  ReceivableRegistry — Aletheia
 //  Manages the lifecycle of tokenized export receivables:
 //  register → attest (2-of-3) → mint → active → settled
 // ============================================================

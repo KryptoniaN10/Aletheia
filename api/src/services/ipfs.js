@@ -1,5 +1,5 @@
 // ============================================================
-//  IPFS service — Malabar Ledger
+//  IPFS service — Aletheia
 //  Pins uploaded trade documents to IPFS via Pinata.
 //  Falls back to a local hash-only mode if no Pinata keys set.
 // ============================================================
@@ -46,7 +46,7 @@ export async function pinToIPFS(fileBuffer, filename, metadata = {}) {
   const pinataMetadata = JSON.stringify({
     name: filename,
     keyvalues: {
-      service: 'malabar-ledger',
+      service: 'aletheia',
       ...metadata,
     },
   });

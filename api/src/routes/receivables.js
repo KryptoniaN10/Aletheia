@@ -1,5 +1,5 @@
 // ============================================================
-//  Receivables Router — Malabar Ledger API
+//  Receivables Router — Aletheia API
 //  POST /api/receivables/register    — upload doc + register on-chain
 //  GET  /api/receivables             — list all receivables
 //  GET  /api/receivables/:id         — get single receivable

@@ -28,11 +28,10 @@ export default function Footer() {
               color: 'var(--color-text-ink-light)',
               marginBottom: 'var(--space-3)'
             }}>
-              MALABAR <span style={{ color: 'var(--color-saffron-light)' }}>LEDGER</span>
+              ALETHEIA
             </h4>
             <p style={{ opacity: 0.7, lineHeight: 1.6, fontSize: '0.8rem' }}>
-              Tokenizing trade finance receivables for Kerala's heritage spice & seafood exporters. 
-              Bridging the real-world trade economy with the Stellar network.
+              Truth in Trade, Trust in Time. Turning verified receivables into tokenized assets on Stellar to reveal truth to investors and accelerate trust for exporters.
             </p>
           </div>
 
@@ -71,7 +70,7 @@ export default function Footer() {
           opacity: 0.5,
           fontSize: '0.75rem'
         }}>
-          <span>&copy; {new Date().getFullYear()} Malabar Ledger. All rights reserved.</span>
+          <span>&copy; {new Date().getFullYear()} Aletheia. All rights reserved.</span>
           <span>Stellar Build Better 2026 Submission · Built for Demonstration Purposes</span>
         </div>
       </div>

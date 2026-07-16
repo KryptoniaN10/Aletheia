@@ -30,12 +30,12 @@ export default function Marketplace() {
       <div className="container">
         {/* Header */}
         <div style={{ marginBottom: 'var(--space-6)' }}>
-          <div className="section-label" style={{ color: 'var(--color-saffron)' }}>Open Ledger</div>
+          <div className="section-label" style={{ color: 'var(--color-saffron)' }}>Asset Registry</div>
           <h1 className="display-md" style={{ marginBottom: 'var(--space-2)' }}>
             Trade Finance <span style={{ color: 'var(--color-teal)' }}>Marketplace</span>
           </h1>
           <p className="text-secondary text-ui-md" style={{ maxWidth: '600px' }}>
-            Browse and invest in fractionalized export bills verified by the Malabar trade protocol.
+            Browse and invest in fractionalized export bills verified by the Aletheia trade protocol.
           </p>
         </div>
 

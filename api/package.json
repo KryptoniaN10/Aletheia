@@ -1,7 +1,7 @@
 {
-  "name": "malabar-ledger-api",
+  "name": "aletheia-api",
   "version": "1.0.0",
-  "description": "Off-chain verification service for Malabar Ledger",
+  "description": "Off-chain verification service for Aletheia",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^12.3.0",
-    "better-sqlite3": "^9.4.5",
+    "better-sqlite3": "^12.11.1",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^16.4.5",

@@ -10,10 +10,99 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../db/schema.js';
 import { authorizeInvestorTrustline, createSponsoredTrustline } from '../services/stellar.js';
+import crypto from 'crypto';
+
+// ── Password helpers (PBKDF2, no extra packages) ──────────────
+const SALT_ROUNDS = 10000;
+const KEY_LEN = 64;
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, SALT_ROUNDS, KEY_LEN, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  const [salt, storedHash] = stored.split(':');
+  const hash = crypto.pbkdf2Sync(password, salt, SALT_ROUNDS, KEY_LEN, 'sha512').toString('hex');
+  return hash === storedHash;
+}
 
 const router = express.Router();
 
-// ── Start KYC session ─────────────────────────────────────────
+// ── Register a new user ───────────────────────────────────────
+router.post('/register', (req, res) => {
+  const db = getDb();
+  const { username, email, password, role, full_name, company_name } = req.body;
+
+  if (!username || !email || !password || !role) {
+    return res.status(400).json({ error: 'username, email, password and role are required' });
+  }
+  if (!['investor', 'exporter'].includes(role)) {
+    return res.status(400).json({ error: 'role must be investor or exporter' });
+  }
+
+  const existing = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
+  if (existing) {
+    return res.status(409).json({ error: 'An account with that username or email already exists.' });
+  }
+
+  const password_hash = hashPassword(password);
+  const result = db.prepare(
+    'INSERT INTO users (username, email, password_hash, role, full_name, company_name) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(username, email, password_hash, role, full_name || null, company_name || null);
+
+  res.status(201).json({ id: result.lastInsertRowid, username, email, role, message: 'Account created successfully.' });
+});
+
+// ── Login ─────────────────────────────────────────────────────
+router.post('/login', (req, res) => {
+  const db = getDb();
+  const { identifier, password, requested_role } = req.body;
+
+  if (!identifier || !password) {
+    return res.status(400).json({ error: 'identifier (username or email) and password are required' });
+  }
+
+  // Check admin credentials first (hardcoded, can log in from any portal tab)
+  if ((identifier === 'admin' || identifier === 'admin@aletheia.io') && password === 'admin') {
+    return res.json({
+      id: 0,
+      username: 'admin',
+      email: 'admin@aletheia.io',
+      role: 'admin',
+      wallet_address: 'GDEMO5LOGISTICS1PARTNER1ALETHEIA1FREIGHT1111111111111111',
+      message: 'Admin login successful.'
+    });
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE username = ? OR email = ?').get(identifier, identifier);
+
+  if (!user) {
+    return res.status(401).json({ error: 'No account found with that username or email.' });
+  }
+
+  if (!verifyPassword(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Incorrect password.' });
+  }
+
+  // Enforce portal gate — non-admins must use their registered portal
+  if (requested_role && user.role !== 'admin' && user.role !== requested_role) {
+    return res.status(403).json({ error: `This account is registered as an ${user.role}. Please use the ${user.role} portal.` });
+  }
+
+  res.json({
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    role: user.role,
+    full_name: user.full_name,
+    company_name: user.company_name,
+    wallet_address: user.wallet_address,
+    message: 'Login successful.'
+  });
+});
+
 // In production: redirect to an Anchor's SEP-24 interactive flow.
 // Here: collect basic info and store as pending.
 router.post('/kyc/start', (req, res) => {
@@ -182,7 +271,7 @@ router.get('/kyc/:session/interactive', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Malabar Ledger — KYC Verification</title>
+  <title>Aletheia — KYC Verification</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, sans-serif; background: #0a1628; color: #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
@@ -209,7 +298,7 @@ router.get('/kyc/:session/interactive', (req, res) => {
 </head>
 <body>
   <div class="card">
-    <div class="logo">🌊 Malabar Ledger</div>
+    <div class="logo">⚖️ Aletheia</div>
     <div class="subtitle">Investor Identity Verification (Mock SEP-24 KYC)</div>
     <h2>Verify Your Identity</h2>
     <hr class="sep">

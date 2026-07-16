@@ -1,5 +1,5 @@
 // ============================================================
-//  FractionalSale — Malabar Ledger
+//  FractionalSale — Aletheia
 //  Manages fractional sale of attested receivable tokens.
 //  Investors purchase shares at a discount; proceeds flow to
 //  the exporter immediately when the sale closes.

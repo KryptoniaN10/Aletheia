@@ -1,5 +1,5 @@
 // ============================================================
-//  Malabar Ledger — Off-chain Verification API
+//  Aletheia — Off-chain Verification API (database reload spacer)
 //  Handles: document upload + hashing, attestation routing,
 //  mock KYC/Anchor SEP-24, oracle payment confirmation,
 //  and Stellar testnet coordination.
@@ -13,6 +13,7 @@ import receivablesRouter from './routes/receivables.js';
 import authRouter from './routes/auth.js';
 import oracleRouter from './routes/oracle.js';
 import stellarRouter from './routes/stellar.js';
+import chatbotRouter from './chatbot/routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,7 +26,7 @@ app.use(express.json({ limit: '10mb' }));
 app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
-    service: 'malabar-ledger-api',
+    service: 'aletheia-api',
     network: process.env.STELLAR_NETWORK || 'testnet',
     timestamp: new Date().toISOString(),
   });
@@ -36,6 +37,7 @@ app.use('/api/receivables', receivablesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/oracle', oracleRouter);
 app.use('/api/stellar', stellarRouter);
+app.use('/api/chat', chatbotRouter);
 
 // ── Platform stats (used by Landing page) ─────────────────────
 app.get('/api/stats', (_req, res) => {
@@ -70,7 +72,7 @@ app.use((err, _req, res, _next) => {
 // ── Start ─────────────────────────────────────────────────────
 initDb().then(() => {
   app.listen(PORT, () => {
-    console.log(`\n🌊 Malabar Ledger API running on http://localhost:${PORT}`);
+    console.log(`\n⚖️ Aletheia API running on http://localhost:${PORT}`);
     console.log(`   Network: ${process.env.STELLAR_NETWORK || 'testnet'}`);
     console.log(`   Horizon: ${process.env.STELLAR_HORIZON_URL}\n`);
   });

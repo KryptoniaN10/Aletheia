@@ -1,5 +1,5 @@
 // ============================================================
-//  Stellar SDK service — Malabar Ledger
+//  Stellar SDK service — Aletheia
 //  Wraps all Stellar/Soroban operations for the API layer.
 //  Handles: account setup, asset flags, sponsored reserves,
 //  trustline authorization, DEX offers, and contract calls.

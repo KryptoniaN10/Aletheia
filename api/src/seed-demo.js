@@ -1,5 +1,5 @@
 // ============================================================
-//  seed-demo.js — Malabar Ledger Demo Data Seeder
+//  seed-demo.js — Aletheia Demo Data Seeder
 //  Populates the database with realistic Kerala export
 //  receivables at every stage of the lifecycle, so judges
 //  can experience the full flow immediately on first load.
@@ -100,7 +100,7 @@ export function seedDemo(db) {
   const EXPORTER_2        = 'GDEMO2EXPORTER2KERALA2SEAFOOD2THRISSUR2222222222222222222';
   const INVESTOR_1        = 'GDEMO3INVESTOR1DIASPORA1NRI1DUBAI111111111111111111111111';
   const INVESTOR_2        = 'GDEMO4INVESTOR2LOCAL1CALICUT1ANGEL1111111111111111111111';
-  const ATTESTOR_LOGISTICS = 'GDEMO5LOGISTICS1PARTNER1MALABAR1FREIGHT1111111111111111';
+  const ATTESTOR_LOGISTICS = 'GDEMO5LOGISTICS1PARTNER1ALETHEIA1FREIGHT1111111111111111';
   const ATTESTOR_COUNCIL   = 'GDEMO6EXPORT1COUNCIL1SPICES1BOARD1KERALA111111111111111';
   const ATTESTOR_NBFC      = 'GDEMO7NBFC1KERALA1FINANCIAL1SERVICES1111111111111111111';
 
@@ -241,9 +241,9 @@ if (isMain) {
     ? (process.env.DATABASE_URL.startsWith('.')
         ? path.resolve(path.join(__dirname, '../..', process.env.DATABASE_URL))
         : process.env.DATABASE_URL)
-    : path.join(__dirname, '../../malabar.db');
+    : path.join(__dirname, '../../aletheia.db');
 
-  console.log('🌊 Malabar Ledger — Demo Seeder');
+  console.log('⚖️ Aletheia — Demo Seeder');
   console.log('================================');
   console.log(`DB: ${DB_PATH}`);
 

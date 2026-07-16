@@ -1,5 +1,5 @@
 // ============================================================
-//  SettlementEscrow — Malabar Ledger
+//  SettlementEscrow — Aletheia
 //  Holds importer payment and distributes pro-rata to all
 //  receivable token holders when payment is confirmed.
 //  Includes clawback for fraud/dispute scenarios.

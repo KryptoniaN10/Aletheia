@@ -353,7 +353,7 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
                   <button
                     className="btn btn-outline btn-sm"
                     onClick={() => {
-                      const text = `Malabar Ledger Receivable #${submitted.id}\nDoc Hash: ${submitted.doc_hash}\nAmount: $${submitted.amount_usd?.toLocaleString()}\nRequest your attestation via the Admin panel.`;
+                      const text = `Aletheia Receivable #${submitted.id}\nDoc Hash: ${submitted.doc_hash}\nAmount: $${submitted.amount_usd?.toLocaleString()}\nRequest your attestation via the Admin panel.`;
                       navigator.clipboard.writeText(text).catch(() => {});
                     }}
                     id="copy-attestation-request-btn"

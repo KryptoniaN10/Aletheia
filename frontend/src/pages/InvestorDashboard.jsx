@@ -48,7 +48,7 @@ export default function InvestorDashboard({ walletAddress, onConnect }) {
       <div className="container">
         {/* Header */}
         <div style={{ marginBottom: 'var(--space-6)' }}>
-          <div className="section-label" style={{ color: 'var(--color-saffron)' }}>Investor Ledger</div>
+          <div className="section-label" style={{ color: 'var(--color-saffron)' }}>Investor Portfolio</div>
           <h1 style={{ marginBottom: 'var(--space-2)' }}>
             Portfolio <span style={{ color: 'var(--color-teal)' }}>Summary</span>
           </h1>

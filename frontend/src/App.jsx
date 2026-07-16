@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing.jsx';
 import ExporterDashboard from './pages/ExporterDashboard.jsx';
 import InvestorDashboard from './pages/InvestorDashboard.jsx';
@@ -8,19 +8,99 @@ import NotFound from './pages/NotFound.jsx';
 import Marketplace from './pages/Marketplace.jsx';
 import ReceivableDetail from './pages/ReceivableDetail.jsx';
 import HowItWorks from './pages/HowItWorks.jsx';
+import Login from './pages/Login.jsx';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
+import ChatbotWidget from './components/ChatbotWidget.jsx';
 import { connectFreighter, getFreighterPublicKey } from './stellar/client.js';
+
+const ProtectedRoute = ({ element, role, walletAddress, userRole, setShowLoginModal }) => {
+  const isAuthorized = walletAddress && userRole === role;
+  useEffect(() => {
+    if (!isAuthorized) {
+      setShowLoginModal(true);
+    }
+  }, [isAuthorized, setShowLoginModal]);
+
+  return isAuthorized ? element : <Navigate to="/" replace />;
+};
 
 export default function App() {
   const [walletAddress, setWalletAddress] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [connecting, setConnecting] = useState(false);
   const [showMobileModal, setShowMobileModal] = useState(false);
-  const location = useLocation();
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  
+  // Credentials fields inside the global admin modal
+  const [adminUser, setAdminUser] = useState('');
+  const [adminPass, setAdminPass] = useState('');
+  const [adminError, setAdminError] = useState('');
 
-  // Restore wallet on mount
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Restore wallet and role on mount (only if previously logged in)
   useEffect(() => {
-    getFreighterPublicKey().then(setWalletAddress);
+    const storedAddr = localStorage.getItem('userAddress');
+    const storedRole = localStorage.getItem('userRole');
+    if (storedAddr && storedRole) {
+      setWalletAddress(storedAddr);
+      setUserRole(storedRole);
+    } else {
+      setWalletAddress(null);
+      setUserRole(null);
+    }
+  }, []);
+
+  const handleLogin = (address, role) => {
+    setWalletAddress(address);
+    setUserRole(role);
+    localStorage.setItem('userAddress', address);
+    localStorage.setItem('userRole', role);
+  };
+
+  const handleDisconnect = () => {
+    setWalletAddress(null);
+    setUserRole(null);
+    localStorage.removeItem('userAddress');
+    localStorage.removeItem('userRole');
+    navigate('/login');
+  };
+
+  // Global keydown listener for Ctrl+Shift+A & "admin" keyboard sequence detection
+  useEffect(() => {
+    let keyBuffer = [];
+    const handleKeyDown = (e) => {
+      // 1. Check for Ctrl + Shift + A
+      if (e.ctrlKey && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setAdminError('');
+        setShowAdminModal(true);
+        return;
+      }
+
+      // Ignore inputs/textareas to prevent false triggers when typing in text fields
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+        return;
+      }
+
+      // 2. Check for typing "admin"
+      keyBuffer.push(e.key.toLowerCase());
+      if (keyBuffer.length > 5) {
+        keyBuffer.shift();
+      }
+
+      if (keyBuffer.join('') === 'admin') {
+        setAdminError('');
+        setShowAdminModal(true);
+        keyBuffer = []; // Clear buffer
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   async function handleConnect() {
@@ -28,7 +108,15 @@ export default function App() {
     try {
       const address = await connectFreighter();
       if (address) {
-        setWalletAddress(address);
+        let role = localStorage.getItem('userRole');
+        if (!role) {
+          if (location.pathname.startsWith('/exporter')) {
+            role = 'exporter';
+          } else {
+            role = 'investor';
+          }
+        }
+        handleLogin(address, role);
       } else {
         setShowMobileModal(true);
       }
@@ -38,32 +126,128 @@ export default function App() {
     setConnecting(false);
   }
 
+  const handleAdminModalSubmit = (e) => {
+    e.preventDefault();
+    if (adminUser.trim().toLowerCase() === 'admin' && adminPass === 'admin') {
+      handleLogin('GDEMO5LOGISTICS1PARTNER1ALETHEIA1FREIGHT1111111111111111', 'admin');
+      setShowAdminModal(false);
+      setAdminUser('');
+      setAdminPass('');
+      navigate('/admin');
+    } else {
+      setAdminError('Invalid admin credentials. Use admin/admin');
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--color-bg-base)', color: 'var(--color-text-primary)' }}>
       {/* Navbar */}
       <Navbar 
         walletAddress={walletAddress}
+        userRole={userRole}
         connecting={connecting}
         onConnect={handleConnect}
-        onDisconnect={() => setWalletAddress(null)}
+        onDisconnect={handleDisconnect}
       />
 
       {/* Main Content Area */}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, paddingTop: 'var(--nav-height)' }}>
         <Routes>
-          <Route path="/" element={<Landing walletAddress={walletAddress} onConnect={handleConnect} />} />
+          <Route path="/" element={<Landing walletAddress={walletAddress} onConnect={handleConnect} onOpenLogin={() => setShowLoginModal(true)} />} />
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/receivable/:id" element={<ReceivableDetail walletAddress={walletAddress} onConnect={handleConnect} />} />
-          <Route path="/dashboard" element={<InvestorDashboard walletAddress={walletAddress} onConnect={handleConnect} />} />
-          <Route path="/exporter" element={<ExporterDashboard walletAddress={walletAddress} onConnect={handleConnect} />} />
+          <Route path="/dashboard" element={<ProtectedRoute element={<InvestorDashboard walletAddress={walletAddress} onConnect={handleConnect} />} role="investor" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
+          <Route path="/exporter" element={<ProtectedRoute element={<ExporterDashboard walletAddress={walletAddress} onConnect={handleConnect} />} role="exporter" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
-          <Route path="/admin" element={<AdminPanel walletAddress={walletAddress} />} />
+          <Route path="/admin" element={<ProtectedRoute element={<AdminPanel walletAddress={walletAddress} />} role="admin" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
 
       {/* Footer */}
       <Footer />
+
+      {/* Global Admin Bypass Authentication Modal */}
+      {showAdminModal && (
+        <div className="modal-backdrop" style={{ zIndex: 1100 }} onClick={() => setShowAdminModal(false)}>
+          <div className="modal" style={{ maxWidth: 400, border: '1px solid var(--color-saffron)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ fontFamily: 'var(--font-display)', margin: 0 }}>🛡️ Administrative Login Bypass</h3>
+              <button className="modal-close" onClick={() => setShowAdminModal(false)}>✕</button>
+            </div>
+            
+            <p className="text-ui-xs text-secondary" style={{ marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
+              You triggered the administrative authentication prompt. Enter details to access the supervisor panel directly.
+            </p>
+
+            <form onSubmit={handleAdminModalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              <div>
+                <label className="label" style={{ marginBottom: '4px', display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>Username</label>
+                <input
+                  type="text"
+                  value={adminUser}
+                  onChange={(e) => setAdminUser(e.target.value)}
+                  placeholder="admin"
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-base)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '0.85rem'
+                  }}
+                />
+              </div>
+              <div>
+                <label className="label" style={{ marginBottom: '4px', display: 'block', fontSize: '0.75rem', fontWeight: 600 }}>Password</label>
+                <input
+                  type="password"
+                  value={adminPass}
+                  onChange={(e) => setAdminPass(e.target.value)}
+                  placeholder="••••••••"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-base)',
+                    color: 'var(--color-text-primary)',
+                    fontSize: '0.85rem'
+                  }}
+                />
+              </div>
+
+              {adminError && (
+                <div style={{ color: 'var(--color-red)', fontSize: '0.75rem', textAlign: 'center' }}>
+                  ❌ {adminError}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-full btn-sm"
+                  onClick={() => setShowAdminModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-full btn-sm"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--color-saffron), #e58a13)',
+                    borderColor: 'var(--color-saffron)'
+                  }}
+                >
+                  Authenticate
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Wallet Guide Modal */}
       {showMobileModal && (
@@ -122,6 +306,14 @@ export default function App() {
           </div>
         </div>
       )}
+      <Login 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)} 
+        onLogin={handleLogin} 
+      />
+
+      {/* Global Chatbot Support Assistant */}
+      <ChatbotWidget walletAddress={walletAddress} userRole={userRole} />
     </div>
   );
 }

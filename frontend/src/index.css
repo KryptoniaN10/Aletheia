@@ -1,7 +1,7 @@
 /* ============================================================
-   Malabar Ledger — Design System
-   Kerala-inspired dark theme: deep ocean teal, saffron spice,
-   cardamom green, and antique gold. Premium glassmorphism UI.
+   Aletheia — Design System
+   Global institutional theme: deep sapphire navy, warm amber saffron,
+   and antique gold. Premium glassmorphism UI.
    ============================================================ */
 
 /* ── Google Fonts ────────────────────────────────────────────── */
@@ -9,7 +9,7 @@
 
 /* ── CSS Variables (Design Tokens) ──────────────────────────── */
 :root {
-  /* Color Palette — Coastal Ledger (Parchment & Ink) */
+  /* Color Palette — Aletheia Ledger (Parchment, Navy & Gold) */
   --color-bg-deep:      #F5F0E6;        /* Warm aged paper */
   --color-bg-base:      #FAF8F5;        /* Premium parchment */
   --color-bg-surface:   #FFFFFF;        /* Pure paper surface */
@@ -22,21 +22,21 @@
   --color-text-ink-light:#FAF8F5;       /* Parchment color text for dark sections */
 
   /* Brand colors */
-  --color-teal:         #0E4D4A;        /* Malabar Teal (deep Arabian Sea) */
-  --color-teal-light:   #1E6E6A;        /* Readable teal link */
-  --color-teal-dark:    #062A29;
-  --color-saffron:      #B8863B;        /* Muted Kerala spice/brass */
-  --color-saffron-light:#D4A252;
-  --color-saffron-dark: #8E6023;
+  --color-teal:         #0F2537;        /* Aletheia Sapphire (deep institutional navy) */
+  --color-teal-light:   #1E4E7C;        /* Slate blue link */
+  --color-teal-dark:    #071524;
+  --color-saffron:      #C49A45;        /* Radiant Aletheia Saffron (truth & time gold) */
+  --color-saffron-light:#DFB15B;
+  --color-saffron-dark: #8F6E29;
   --color-green:        #5C7D64;        /* Cardamom sage green */
   --color-green-light:  #73967C;
-  --color-gold:         #A87B3B;        /* Antique Malabar gold */
-  --color-gold-light:   #C49652;
+  --color-gold:         #B89047;        /* Antique Gold */
+  --color-gold-light:   #D7AF62;
 
   /* Status colors — Desaturated & Harmonized */
-  --color-pending:      #B8863B;        /* Brass/Ochre */
+  --color-pending:      #C49A45;        /* Radiant gold */
   --color-attested:     #5C7D64;        /* Sage green */
-  --color-active:       #0E4D4A;        /* Deep teal */
+  --color-active:       #0F2537;        /* Deep sapphire */
   --color-settled:      #5E7385;        /* Slate blue */
   --color-clawback:     #B56658;        /* Terracotta red */
 
@@ -44,26 +44,26 @@
   --color-text-primary:   #1A1712;      /* Near-black warm ink */
   --color-text-secondary: #4E463C;      /* Secondary charcoal */
   --color-text-muted:     #7E7468;      /* Muted graphite */
-  --color-text-accent:    #0E4D4A;      /* Malabar teal accent */
+  --color-text-accent:    #0F2537;      /* Aletheia navy accent */
 
   /* Borders */
   --color-border:       rgba(26, 23, 18, 0.12); /* Hairline low-opacity ink */
-  --color-border-gold:  rgba(184, 134, 59, 0.25);
-  --color-border-glow:  rgba(14, 77, 74, 0.18);
+  --color-border-gold:  rgba(196, 154, 69, 0.25);
+  --color-border-glow:  rgba(15, 37, 55, 0.18);
 
   /* Gradients */
-  --gradient-brand:     linear-gradient(135deg, #0E4D4A 0%, #5C7D64 100%);
-  --gradient-saffron:   linear-gradient(135deg, #B8863B 0%, #8E6023 100%);
+  --gradient-brand:     linear-gradient(135deg, #0F2537 0%, #1E4E7C 100%);
+  --gradient-saffron:   linear-gradient(135deg, #C49A45 0%, #8F6E29 100%);
   --gradient-hero:      linear-gradient(180deg, #F5F0E6 0%, #FAF8F5 100%);
   --gradient-card:      linear-gradient(145deg, #FFFFFF 0%, #FAF8F5 100%);
-  --gradient-glow-teal: radial-gradient(ellipse at center, rgba(14,77,74,0.05) 0%, transparent 70%);
-  --gradient-glow-saffron: radial-gradient(ellipse at center, rgba(184,134,59,0.04) 0%, transparent 70%);
+  --gradient-glow-teal: radial-gradient(ellipse at center, rgba(15,37,55,0.05) 0%, transparent 70%);
+  --gradient-glow-saffron: radial-gradient(ellipse at center, rgba(196,154,69,0.04) 0%, transparent 70%);
 
   /* Shadows — premium thin borders over heavy shadows */
   --shadow-card:        0 1px 3px rgba(26, 23, 18, 0.04);
   --shadow-elevated:    0 4px 16px rgba(26, 23, 18, 0.06);
-  --shadow-glow-teal:   0 0 16px rgba(14, 77, 74, 0.08);
-  --shadow-glow-saffron: 0 0 16px rgba(184, 134, 59, 0.08);
+  --shadow-glow-teal:   0 0 16px rgba(15, 37, 55, 0.08);
+  --shadow-glow-saffron: 0 0 16px rgba(196, 154, 69, 0.08);
   --shadow-button:      0 1px 2px rgba(26, 23, 18, 0.05);
 
   /* Typography */

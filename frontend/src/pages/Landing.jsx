@@ -5,7 +5,7 @@ import StatCard from '../components/StatCard.jsx';
 import NetworkStatusIndicator from '../components/NetworkStatusIndicator.jsx';
 import VerifiedBadge from '../components/VerifiedBadge.jsx';
 
-export default function Landing({ walletAddress, onConnect }) {
+export default function Landing({ walletAddress, onConnect, onOpenLogin }) {
   const [liveStats, setLiveStats] = useState(null);
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function Landing({ walletAddress, onConnect }) {
               marginBottom: 'var(--space-3)'
             }}
           >
-            🌿 Trade Finance Protocol of the Malabar Coast
+            ✧ Truth in Trade, Trust in Time ✧
           </div>
           
           <h1 
@@ -59,7 +59,7 @@ export default function Landing({ walletAddress, onConnect }) {
               color: 'var(--color-text-primary)' 
             }}
           >
-            Same-Day Working Capital for <span style={{ color: 'var(--color-teal)' }}>Kerala's Exporters</span>
+            Immediate Liquidity for <span style={{ color: 'var(--color-teal)' }}>Kerala's Exporters</span>
           </h1>
           
           <p 
@@ -70,8 +70,8 @@ export default function Landing({ walletAddress, onConnect }) {
               lineHeight: 1.7 
             }}
           >
-            Tokenize and fractionalize export receivables. Sell invoices to global liquidity partners instantly.
-            Backed by physical shipping bills. Settled securely on the Stellar network.
+            Exporters shouldn’t wait months for liquidity when the receivable is already real. 
+            Aletheia turns verified receivables into tokenized assets on Stellar, revealing truth to investors and accelerating trust for exporters.
           </p>
 
           <div 
@@ -82,11 +82,11 @@ export default function Landing({ walletAddress, onConnect }) {
             }}
           >
             <Link to="/marketplace" className="btn btn-primary btn-lg">
-              Explore Receivables
+              Marketplace
             </Link>
-            <Link to="/exporter" className="btn btn-outline btn-lg">
-              For Exporters
-            </Link>
+            <button onClick={onOpenLogin} className="btn btn-outline btn-lg">
+              Login
+            </button>
           </div>
         </div>
       </section>

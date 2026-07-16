@@ -7,7 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = process.env.DATABASE_URL || path.join(__dirname, '../../../malabar.db');
+const DB_PATH = process.env.DATABASE_URL || path.join(__dirname, '../../../aletheia.db');
 
 let db;
 
@@ -90,6 +90,19 @@ export async function initDb() {
       tx_hash         TEXT,
       triggered_by    TEXT,
       occurred_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- ── Users (credential-based auth) ────────────────────────
+    CREATE TABLE IF NOT EXISTS users (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      username        TEXT NOT NULL UNIQUE,
+      email           TEXT NOT NULL UNIQUE,
+      password_hash   TEXT NOT NULL,
+      role            TEXT NOT NULL CHECK(role IN ('investor', 'exporter', 'admin')),
+      full_name       TEXT,
+      company_name    TEXT,
+      wallet_address  TEXT,
+      created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
