@@ -8,10 +8,15 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = process.env.DATABASE_URL || path.join(__dirname, '../../../aletheia.db');
 
-// Ensure the directory for the DB file exists (important for Railway volumes)
-fs.mkdirSync(path.dirname(path.resolve(DB_PATH)), { recursive: true });
+// Default to ./malabar.db (= /app/malabar.db on Railway) — always writable.
+// Override with DATABASE_URL=/data/malabar.db if you have a Railway volume mounted at /data.
+const DB_PATH = process.env.DATABASE_URL
+  ? path.resolve(process.env.DATABASE_URL)
+  : path.join(process.cwd(), 'malabar.db');
+
+// Ensure the directory exists (critical for volume mounts like /data)
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 
 let db;
 
