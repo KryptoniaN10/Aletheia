@@ -1,8 +1,8 @@
-# Malabar Ledger
+# Aletheia
 
 **Tokenized trade receivables on Stellar for Kerala's spice and seafood exporters.**
 
-Kerala's exporters wait 60–90 days to get paid under standard trade terms. Malabar Ledger turns confirmed export receivables into Stellar assets — investors buy fractional shares at a discount, exporters receive same-day working capital, and settlement distributes automatically when the importer pays.
+Kerala's exporters wait 60–90 days to get paid under standard trade terms. Aletheia turns confirmed export receivables into Stellar assets — investors buy fractional shares at a discount, exporters receive same-day working capital, and settlement distributes automatically when the importer pays.
 
 > Built for Stellar Build Better 2026 · Deployed on Stellar Testnet
 
@@ -177,7 +177,7 @@ malabar-ledger/
 
 Kozhikode (Calicut) was the center of the global spice trade when Vasco da Gama arrived in 1498 — the origin point of the first true globalization of commerce. The problem this project solves — exporters waiting months to access payment on goods already shipped — is as old as the trade itself.
 
-Malabar Ledger makes Kozhikode the origin point of the solution.
+Aletheia makes Kozhikode the origin point of the solution.
 
 ---
 
