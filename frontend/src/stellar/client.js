@@ -6,7 +6,8 @@
 //  real Soroban invocations — the API surface is identical.
 // ============================================================
 
-import { Horizon, Networks, Asset } from '@stellar/stellar-sdk';
+import { Horizon, Networks, Asset, TransactionBuilder, Operation, Memo, BASE_FEE } from '@stellar/stellar-sdk';
+import { requestAccess, getPublicKey, signTransaction } from '@stellar/freighter-api';
 
 const NETWORK = import.meta.env.VITE_STELLAR_NETWORK || 'testnet';
 const HORIZON_URL = import.meta.env.VITE_HORIZON_URL || 'https://horizon-testnet.stellar.org';
@@ -26,8 +27,6 @@ export async function connectFreighter() {
   if (typeof window === 'undefined') return null;
 
   try {
-    const { requestAccess, getPublicKey } = await import('@stellar/freighter-api');
-
     // 1. Try requestAccess() first — this triggers the Freighter popup
     //    and works for both the extension and mobile app's built-in browser.
     try {
@@ -61,7 +60,6 @@ export async function connectFreighter() {
 
 export async function getFreighterPublicKey() {
   try {
-    const { getPublicKey, requestAccess } = await import('@stellar/freighter-api');
     const pubKey = await getPublicKey();
     if (typeof pubKey === 'string') return pubKey;
     if (pubKey && pubKey.publicKey) return pubKey.publicKey;
@@ -83,9 +81,6 @@ export async function getFreighterPublicKey() {
 // then submits to Horizon. Returns { hash } on success.
 // The escrow destination is the API issuer (production: a smart contract).
 export async function signTransactionWithFreighter({ investorAddress, paymentUsd, receivableId }) {
-  const { signTransaction } = await import('@stellar/freighter-api');
-  const { TransactionBuilder, BASE_FEE, Networks } = await import('@stellar/stellar-sdk');
-
   const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
   const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_ADDRESS || investorAddress; // fallback to self in demo
 
@@ -98,13 +93,13 @@ export async function signTransactionWithFreighter({ investorAddress, paymentUsd
     networkPassphrase: NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET,
   })
     .addOperation(
-      (await import('@stellar/stellar-sdk')).Operation.payment({
+      Operation.payment({
         destination: ESCROW_ADDRESS,
         asset: usdcAsset,
         amount: paymentUsd.toFixed(7),
       })
     )
-    .addMemo((await import('@stellar/stellar-sdk')).Memo.text(`ML-REC-${receivableId}`))
+    .addMemo(Memo.text(`ML-REC-${receivableId}`))
     .setTimeout(180)
     .build();
 
@@ -134,8 +129,7 @@ export async function signTransactionWithFreighter({ investorAddress, paymentUsd
   }
 
   // Submit signed transaction to Horizon
-  const { TransactionBuilder: TB } = await import('@stellar/stellar-sdk');
-  const signedTx = TB.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
+  const signedTx = TransactionBuilder.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
   const result = await horizonServer.submitTransaction(signedTx);
   return { hash: result.hash };
 }
@@ -144,9 +138,6 @@ export async function signTransactionWithFreighter({ investorAddress, paymentUsd
 // Calls the API to build a sponsored reserve trustline, signs it
 // with Freighter (beneficiary's signature), and submits it.
 export async function executeSponsoredTrustline(beneficiaryAddress, assetCode) {
-  const { signTransaction } = await import('@stellar/freighter-api');
-  const { TransactionBuilder: TB, Networks } = await import('@stellar/stellar-sdk');
-
   const response = await stellarApi.sponsorTrustline({
     beneficiary_address: beneficiaryAddress,
     asset_code: assetCode,
@@ -180,7 +171,7 @@ export async function executeSponsoredTrustline(beneficiaryAddress, assetCode) {
   }
 
   // Submit to Horizon
-  const signedTx = TB.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
+  const signedTx = TransactionBuilder.fromXDR(signed.signedTxXdr, NETWORK === 'mainnet' ? Networks.PUBLIC : Networks.TESTNET);
   const result = await horizonServer.submitTransaction(signedTx);
   return { hash: result.hash };
 }
