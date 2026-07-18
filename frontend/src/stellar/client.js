@@ -26,42 +26,32 @@ export async function connectFreighter() {
   if (typeof window === 'undefined') return null;
 
   try {
-    // Check window.stellar directly (injects early on mobile app built-in browser)
-    const hasStellarWindow = !!window.stellar;
-    const { isConnected, requestAccess, getPublicKey } = await import('@stellar/freighter-api');
+    const { requestAccess, getPublicKey } = await import('@stellar/freighter-api');
 
-    const connected = await isConnected();
-    const connectedVal = typeof connected === 'boolean' ? connected : !!(connected && connected.isConnected);
-    const isAvailable = hasStellarWindow || connectedVal;
-
-    if (!isAvailable) {
-      console.warn('[Freighter] Neither extension nor mobile app is detected.');
-      return null;
-    }
-
-    // Try requestAccess (works on both extension and mobile app)
+    // 1. Try requestAccess() first — this triggers the Freighter popup
+    //    and works for both the extension and mobile app's built-in browser.
     try {
       const access = await requestAccess();
-      if (access && access.address) {
-        return access.address;
-      }
-      if (access && access.error) {
-        throw new Error(access.error);
-      }
+      if (access && access.address) return access.address;
+      if (access && access.error) throw new Error(access.error);
+      // Some versions return a plain string
+      if (typeof access === 'string' && access.startsWith('G')) return access;
     } catch (e) {
-      console.warn('[Freighter] requestAccess failed, trying fallback:', e.message);
+      console.warn('[Freighter] requestAccess failed, trying getPublicKey:', e.message);
     }
 
-    // Try getPublicKey (legacy returns string directly)
+    // 2. Fallback: getPublicKey() (legacy Freighter API)
     const pubKey = await getPublicKey();
-    if (typeof pubKey === 'string') return pubKey;
+    if (typeof pubKey === 'string' && pubKey.startsWith('G')) return pubKey;
     if (pubKey && pubKey.publicKey) return pubKey.publicKey;
 
-    // Direct window.stellar fallback
+    // 3. Direct window.stellar injection (Freighter mobile app browser)
     if (window.stellar && typeof window.stellar.getPublicKey === 'function') {
       return await window.stellar.getPublicKey();
     }
 
+    // 4. Freighter not detected — show mobile guide
+    console.warn('[Freighter] Extension not found. Showing mobile guide.');
     return null;
   } catch (err) {
     console.warn('[Freighter] Error connecting:', err.message);
