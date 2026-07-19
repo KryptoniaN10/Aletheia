@@ -6,6 +6,7 @@ import NetworkStatusIndicator from './NetworkStatusIndicator.jsx';
 export default function Navbar({ walletAddress, userRole, connecting, onConnect, onDisconnect }) {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
+  const isMarketplaceFromHome = (location.pathname === '/marketplace' || location.pathname.startsWith('/receivable/')) && location.state?.fromHome;
 
   return (
     <nav className="navbar" style={{
@@ -53,28 +54,28 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
               Home
             </NavLink>
           </li>
-          {!isLandingPage && walletAddress && userRole === 'investor' && (
+          {!isMarketplaceFromHome && !isLandingPage && walletAddress && userRole === 'investor' && (
             <li>
               <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
                 Investor Dashboard
               </NavLink>
             </li>
           )}
-          {!isLandingPage && walletAddress && userRole === 'exporter' && (
+          {!isMarketplaceFromHome && !isLandingPage && walletAddress && userRole === 'exporter' && (
             <li>
               <NavLink to="/exporter" className={({ isActive }) => isActive ? 'active' : ''}>
                 Exporter Portal
               </NavLink>
             </li>
           )}
-          {(isLandingPage || !walletAddress) && (
+          {!isMarketplaceFromHome && (isLandingPage || !walletAddress) && (
             <li>
               <NavLink to="/how-it-works" className={({ isActive }) => isActive ? 'active' : ''}>
                 How It Works
               </NavLink>
             </li>
           )}
-          {!isLandingPage && userRole === 'admin' && (
+          {!isMarketplaceFromHome && !isLandingPage && userRole === 'admin' && (
             <li>
               <NavLink to="/admin" className={({ isActive }) => isActive ? 'active' : ''}>
                 Admin
@@ -84,7 +85,7 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
         </ul>
 
         {/* Actions */}
-        {!isLandingPage && (
+        {!isLandingPage && !isMarketplaceFromHome && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <NetworkStatusIndicator />
             {walletAddress && (

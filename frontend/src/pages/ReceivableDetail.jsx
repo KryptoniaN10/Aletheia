@@ -1,16 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { receivablesApi, formatUsd, daysUntil, formatYield } from '../stellar/client.js';
 import SharePurchaseModal from '../components/SharePurchaseModal.jsx';
 import VerifiedBadge from '../components/VerifiedBadge.jsx';
 import ProgressBar from '../components/ProgressBar.jsx';
 
-export default function ReceivableDetail({ walletAddress, onConnect }) {
+export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin }) {
   const { id } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const isFromHomeFlow = location.state?.fromHome;
   const [receivable, setReceivable] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showPurchase, setShowPurchase] = useState(false);
+
+  useEffect(() => {
+    const pendingId = localStorage.getItem('pendingPurchaseId');
+    if (pendingId === id && walletAddress) {
+      localStorage.removeItem('pendingPurchaseId');
+      setShowPurchase(true);
+    }
+  }, [walletAddress, id]);
 
   const fetchDetails = async () => {
     setLoading(true);
@@ -43,7 +54,7 @@ export default function ReceivableDetail({ walletAddress, onConnect }) {
           <div className="card" style={{ textAlign: 'center', padding: 'var(--space-7)' }}>
             <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: 'var(--space-2)' }}>Error Loading Receivable</h3>
             <p className="text-secondary" style={{ marginBottom: 'var(--space-4)' }}>{error || 'Receivable manifest not found.'}</p>
-            <Link to="/marketplace" className="btn btn-primary">Back to Marketplace</Link>
+            <Link to="/marketplace" state={{ fromHome: isFromHomeFlow }} className="btn btn-primary">Back to Marketplace</Link>
           </div>
         </div>
       </div>
@@ -77,7 +88,7 @@ export default function ReceivableDetail({ walletAddress, onConnect }) {
       <div className="container">
         {/* Back Link */}
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <Link to="/marketplace" style={{ color: 'var(--color-teal)', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', fontWeight: 600 }}>
+          <Link to="/marketplace" state={{ fromHome: isFromHomeFlow }} style={{ color: 'var(--color-teal)', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', fontWeight: 600 }}>
             ← Back to Marketplace
           </Link>
         </div>
@@ -190,20 +201,19 @@ export default function ReceivableDetail({ walletAddress, onConnect }) {
                     <span style={{ fontWeight: 700, color: 'var(--color-teal)' }}>{formatUsd(remaining * 100)}</span>
                   </div>
 
-                  {walletAddress ? (
-                    <button className="btn btn-primary btn-full" onClick={() => setShowPurchase(true)}>
-                      Invest in Receivable
-                    </button>
-                  ) : (
-                    <div style={{ textAlign: 'center' }}>
-                      <p className="text-ui-xs text-muted" style={{ marginBottom: 'var(--space-3)' }}>
-                        Freighter wallet connection required to verify credentials and invest.
-                      </p>
-                      <button className="btn btn-outline btn-full btn-sm" onClick={onConnect}>
-                        Connect Freighter
-                      </button>
-                    </div>
-                  )}
+                  <button 
+                    className="btn btn-primary btn-full" 
+                    onClick={() => {
+                      if (walletAddress) {
+                        setShowPurchase(true);
+                      } else {
+                        localStorage.setItem('pendingPurchaseId', id);
+                        navigate('/login');
+                      }
+                    }}
+                  >
+                    Invest in Receivable
+                  </button>
                 </>
               ) : (
                 <div style={{ textAlign: 'center', padding: 'var(--space-4) 0' }}>

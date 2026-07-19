@@ -251,6 +251,20 @@ router.get('/kyc', (_req, res) => {
   res.json(sessions);
 });
 
+// ── Link user to wallet address ──────────────────────────────
+router.put('/users/:id/wallet', (req, res) => {
+  const db = getDb();
+  const { wallet_address } = req.body;
+  const { id } = req.params;
+
+  if (!wallet_address) {
+    return res.status(400).json({ error: 'wallet_address required' });
+  }
+
+  db.prepare('UPDATE users SET wallet_address = ? WHERE id = ?').run(wallet_address, id);
+  res.json({ message: 'User wallet address updated successfully.', id, wallet_address });
+});
+
 // ── Mock SEP-24 Interactive KYC Page ─────────────────────────
 // GET /api/auth/kyc/:session/interactive
 // In production: this would be the Anchor's hosted KYC form.

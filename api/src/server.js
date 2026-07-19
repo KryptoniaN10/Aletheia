@@ -5,7 +5,19 @@
 //  and Stellar testnet coordination.
 // ============================================================
 
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// 1. Load from current working directory
+dotenv.config();
+// 2. Load from api/.env explicitly
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// 3. Fallback to root .env
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 import express from 'express';
 import cors from 'cors';
 import { initDb, getDb } from './db/schema.js';

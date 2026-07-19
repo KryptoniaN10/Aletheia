@@ -54,11 +54,25 @@ export default function App() {
     }
   }, []);
 
-  const handleLogin = (address, role) => {
+  const handleLogin = (address, role, userId = null) => {
     setWalletAddress(address);
     setUserRole(role);
+    setShowLoginModal(false);
     localStorage.setItem('userAddress', address);
     localStorage.setItem('userRole', role);
+    if (userId) {
+      localStorage.setItem('userId', userId);
+    }
+
+    const resolvedUserId = userId || localStorage.getItem('userId');
+    if (resolvedUserId && address && !address.startsWith('USER_')) {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      fetch(`${apiBase}/api/auth/users/${resolvedUserId}/wallet`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wallet_address: address })
+      }).catch(err => console.error('Error linking wallet:', err));
+    }
   };
 
   const handleDisconnect = () => {
@@ -66,6 +80,7 @@ export default function App() {
     setUserRole(null);
     localStorage.removeItem('userAddress');
     localStorage.removeItem('userRole');
+    localStorage.removeItem('userId');
     navigate('/login');
   };
 
@@ -155,10 +170,11 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing walletAddress={walletAddress} onConnect={handleConnect} onOpenLogin={() => setShowLoginModal(true)} />} />
           <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/receivable/:id" element={<ReceivableDetail walletAddress={walletAddress} onConnect={handleConnect} />} />
+          <Route path="/receivable/:id" element={<ReceivableDetail walletAddress={walletAddress} onConnect={handleConnect} onOpenLogin={() => setShowLoginModal(true)} />} />
           <Route path="/dashboard" element={<ProtectedRoute element={<InvestorDashboard walletAddress={walletAddress} onConnect={handleConnect} />} role="investor" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="/exporter" element={<ProtectedRoute element={<ExporterDashboard walletAddress={walletAddress} onConnect={handleConnect} />} role="exporter" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/login" element={<Login isOpen={true} onClose={() => navigate(-1)} onLogin={handleLogin} />} />
           <Route path="/admin" element={<ProtectedRoute element={<AdminPanel walletAddress={walletAddress} />} role="admin" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

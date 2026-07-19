@@ -30,6 +30,22 @@ function decodeJwt(token) {
 
 export default function Login({ isOpen, onClose, onLogin }) {
   const navigate = useNavigate();
+
+  const navigateForRole = (role) => {
+    if (role === 'admin') {
+      navigate('/admin');
+    } else if (role === 'investor') {
+      const pendingPurchaseId = localStorage.getItem('pendingPurchaseId');
+      if (pendingPurchaseId) {
+        navigate(`/receivable/${pendingPurchaseId}`);
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      navigate('/exporter');
+    }
+  };
+
   const [activeTab, setActiveTab] = useState('investor');
   const [mode, setMode] = useState('login');
 
@@ -72,11 +88,8 @@ export default function Login({ isOpen, onClose, onLogin }) {
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Login failed.'); setLoading(false); return; }
       const walletAddr = data.wallet_address || `USER_${data.id}_${data.role.toUpperCase()}`;
-      onLogin(walletAddr, data.role);
-      onClose();
-      if (data.role === 'admin') navigate('/admin');
-      else if (data.role === 'investor') navigate('/dashboard');
-      else navigate('/exporter');
+      onLogin(walletAddr, data.role, data.id);
+      navigateForRole(data.role);
     } catch { setError('Cannot reach server. Make sure the API is running.'); }
     setLoading(false);
   };
@@ -140,11 +153,8 @@ export default function Login({ isOpen, onClose, onLogin }) {
           if (loginRes.ok) {
             const data = await loginRes.json();
             const walletAddr = data.wallet_address || `USER_${data.id}_${data.role.toUpperCase()}`;
-            onLogin(walletAddr, data.role);
-            onClose();
-            if (data.role === 'admin') navigate('/admin');
-            else if (data.role === 'investor') navigate('/dashboard');
-            else navigate('/exporter');
+            onLogin(walletAddr, data.role, data.id);
+            navigateForRole(data.role);
             return;
           }
 
@@ -178,10 +188,8 @@ export default function Login({ isOpen, onClose, onLogin }) {
           if (!login2Res.ok) { setError(login2Data.error || 'Auto-login after Google sign-up failed.'); setLoading(false); return; }
 
           const walletAddr = login2Data.wallet_address || `USER_${login2Data.id}_${login2Data.role.toUpperCase()}`;
-          onLogin(walletAddr, login2Data.role);
-          onClose();
-          if (login2Data.role === 'investor') navigate('/dashboard');
-          else navigate('/exporter');
+          onLogin(walletAddr, login2Data.role, login2Data.id);
+          navigateForRole(login2Data.role);
         } catch { setError('Cannot reach server. Make sure the API is running.'); }
         setLoading(false);
       }
