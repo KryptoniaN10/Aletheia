@@ -32,7 +32,18 @@ export default function Login({ isOpen, onClose, onLogin }) {
   const navigate = useNavigate();
 
   const navigateForRole = (role) => {
-    navigate('/');
+    if (role === 'admin') {
+      navigate('/admin');
+    } else if (role === 'investor') {
+      const pendingPurchaseId = localStorage.getItem('pendingPurchaseId');
+      if (pendingPurchaseId) {
+        navigate(`/receivable/${pendingPurchaseId}`);
+      } else {
+        navigate('/dashboard');
+      }
+    } else {
+      navigate('/exporter');
+    }
   };
 
   const [activeTab, setActiveTab] = useState('investor');

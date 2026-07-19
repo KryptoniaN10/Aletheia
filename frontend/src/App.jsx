@@ -84,7 +84,7 @@ export default function App() {
     localStorage.removeItem('userRole');
     localStorage.removeItem('sessionAddress');
     localStorage.removeItem('userId');
-    navigate('/login');
+    navigate('/');
   };
 
   const handleDisconnectWallet = () => {
