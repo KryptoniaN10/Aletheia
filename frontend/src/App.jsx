@@ -10,6 +10,7 @@ import ReceivableDetail from './pages/ReceivableDetail.jsx';
 import HowItWorks from './pages/HowItWorks.jsx';
 import Login from './pages/Login.jsx';
 import Navbar from './components/Navbar.jsx';
+import StellarWallet from './pages/StellarWallet.jsx';
 import Footer from './components/Footer.jsx';
 import ChatbotWidget from './components/ChatbotWidget.jsx';
 import { connectFreighter, getFreighterPublicKey } from './stellar/client.js';
@@ -59,6 +60,7 @@ export default function App() {
     setUserRole(role);
     localStorage.setItem('userAddress', address);
     localStorage.setItem('userRole', role);
+    localStorage.setItem('sessionAddress', address);
   };
 
   const handleDisconnect = () => {
@@ -66,7 +68,18 @@ export default function App() {
     setUserRole(null);
     localStorage.removeItem('userAddress');
     localStorage.removeItem('userRole');
+    localStorage.removeItem('sessionAddress');
     navigate('/login');
+  };
+
+  const handleDisconnectWallet = () => {
+    const baseAddress = localStorage.getItem('sessionAddress');
+    if (baseAddress && baseAddress !== walletAddress) {
+      setWalletAddress(baseAddress);
+      localStorage.setItem('userAddress', baseAddress);
+    } else {
+      handleDisconnect();
+    }
   };
 
   // Global keydown listener for Ctrl+Shift+A & "admin" keyboard sequence detection
@@ -116,7 +129,14 @@ export default function App() {
             role = 'investor';
           }
         }
-        handleLogin(address, role);
+        
+        const existingSession = localStorage.getItem('sessionAddress');
+        if (existingSession) {
+          setWalletAddress(address);
+          localStorage.setItem('userAddress', address);
+        } else {
+          handleLogin(address, role);
+        }
       } else {
         setShowMobileModal(true);
       }
@@ -147,7 +167,8 @@ export default function App() {
         userRole={userRole}
         connecting={connecting}
         onConnect={handleConnect}
-        onDisconnect={handleDisconnect}
+        onDisconnectWallet={handleDisconnectWallet}
+        onLogout={handleDisconnect}
       />
 
       {/* Main Content Area */}
@@ -159,6 +180,7 @@ export default function App() {
           <Route path="/dashboard" element={<ProtectedRoute element={<InvestorDashboard walletAddress={walletAddress} onConnect={handleConnect} />} role="investor" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="/exporter" element={<ProtectedRoute element={<ExporterDashboard walletAddress={walletAddress} onConnect={handleConnect} />} role="exporter" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
+          <Route path="/wallet" element={<ProtectedRoute element={<StellarWallet walletAddress={walletAddress} onConnect={handleConnect} />} role={userRole} walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="/admin" element={<ProtectedRoute element={<AdminPanel walletAddress={walletAddress} />} role="admin" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

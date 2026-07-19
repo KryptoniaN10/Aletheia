@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import WalletConnectButton from './WalletConnectButton.jsx';
 import NetworkStatusIndicator from './NetworkStatusIndicator.jsx';
+import { formatAddress } from '../stellar/client.js';
 
-export default function Navbar({ walletAddress, userRole, connecting, onConnect, onDisconnect }) {
+export default function Navbar({ walletAddress, userRole, connecting, onConnect, onDisconnectWallet, onLogout }) {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
 
@@ -54,18 +54,32 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
             </NavLink>
           </li>
           {!isLandingPage && walletAddress && userRole === 'investor' && (
-            <li>
-              <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
-                Investor Dashboard
-              </NavLink>
-            </li>
+            <>
+              <li>
+                <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
+                  Investor Dashboard
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/wallet" className={({ isActive }) => isActive ? 'active' : ''}>
+                  Stellar Wallet
+                </NavLink>
+              </li>
+            </>
           )}
           {!isLandingPage && walletAddress && userRole === 'exporter' && (
-            <li>
-              <NavLink to="/exporter" className={({ isActive }) => isActive ? 'active' : ''}>
-                Exporter Portal
-              </NavLink>
-            </li>
+            <>
+              <li>
+                <NavLink to="/exporter" className={({ isActive }) => isActive ? 'active' : ''}>
+                  Exporter Portal
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/wallet" className={({ isActive }) => isActive ? 'active' : ''}>
+                  Stellar Wallet
+                </NavLink>
+              </li>
+            </>
           )}
           {(isLandingPage || !walletAddress) && (
             <li>
@@ -84,17 +98,76 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
         </ul>
 
         {/* Actions */}
-        {!isLandingPage && (
+        {!isLandingPage && walletAddress && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <NetworkStatusIndicator />
-            {walletAddress && (
-              <WalletConnectButton 
-                walletAddress={walletAddress}
-                connecting={connecting}
-                onConnect={onConnect}
-                onDisconnect={onDisconnect}
-              />
+            {/* Connected Wallet Address Pill */}
+            <div 
+              style={{ 
+                fontFamily: 'monospace', 
+                fontWeight: 700, 
+                color: 'var(--color-teal)', 
+                border: '1px solid var(--color-teal)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '6px 12px',
+                fontSize: '0.85rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                background: '#FFFFFF'
+              }}
+              title={walletAddress}
+            >
+              {formatAddress(walletAddress, 4)}
+            </div>
+
+            {/* Disconnect Wallet / Link Freighter Button */}
+            {!(walletAddress.startsWith('GDEMO') || walletAddress.startsWith('USER_')) ? (
+              <button 
+                className="btn btn-ghost btn-sm" 
+                onClick={onDisconnectWallet}
+                style={{ 
+                  border: '1px solid var(--color-border)', 
+                  color: 'var(--color-text-secondary)', 
+                  background: '#FFFFFF',
+                  fontWeight: 600,
+                  padding: '7px 14px',
+                  fontSize: '0.8rem'
+                }}
+              >
+                Disconnect Wallet
+              </button>
+            ) : (
+              <button 
+                className="btn btn-primary btn-sm" 
+                onClick={onConnect}
+                style={{ 
+                  background: 'linear-gradient(135deg, var(--color-teal), #009cb7)',
+                  border: '1px solid var(--color-teal)',
+                  color: '#FAF8F5',
+                  fontWeight: 600,
+                  padding: '7px 14px',
+                  fontSize: '0.8rem'
+                }}
+              >
+                🔗 Link Freighter
+              </button>
             )}
+
+            {/* Logout Button */}
+            <button 
+              className="btn btn-ghost btn-sm" 
+              onClick={onLogout}
+              style={{ 
+                border: '1px solid var(--color-border)', 
+                color: 'var(--color-text-secondary)', 
+                background: '#FFFFFF',
+                fontWeight: 600,
+                padding: '7px 14px',
+                fontSize: '0.8rem'
+              }}
+            >
+              Logout
+            </button>
           </div>
         )}
       </div>
