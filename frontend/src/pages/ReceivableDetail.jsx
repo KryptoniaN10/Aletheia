@@ -76,7 +76,7 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
     investments = [],
     created_at,
     // Stellar Expert deep links (populated from real on-chain tx hashes)
-    stellar_expert_asset_url,
+    stellar_expert_transaction_url,
     stellar_expert_registry_url,
     stellar_expert_mint_url,
   } = receivable;
@@ -86,6 +86,10 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
   const remaining = Math.max(0, amount_usd - totalInvested);
   const days = daysUntil(maturity_date);
   const { discount, apy } = formatYield(discount_bps, days);
+  const secondaryRegistryUrl =
+    stellar_expert_registry_url !== stellar_expert_transaction_url ? stellar_expert_registry_url : null;
+  const secondaryMintUrl =
+    stellar_expert_mint_url !== stellar_expert_transaction_url ? stellar_expert_mint_url : null;
 
   return (
     <main className="page-content">
@@ -186,23 +190,23 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
                 </div>
 
                 {/* Stellar Expert on-chain links */}
-                {(stellar_expert_asset_url || stellar_expert_registry_url || stellar_expert_mint_url) && (
+                {(stellar_expert_transaction_url || secondaryRegistryUrl || secondaryMintUrl) && (
                   <div style={{ background: 'var(--color-bg-elevated)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0,201,167,0.2)' }}>
                     <span className="form-label" style={{ fontSize: '0.65rem', display: 'block', marginBottom: '8px' }}>Stellar Testnet Transactions</span>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {stellar_expert_asset_url && (
+                      {stellar_expert_transaction_url && (
                         <a
-                          href={stellar_expert_asset_url}
+                          href={stellar_expert_transaction_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ color: 'var(--color-teal-light)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
                         >
-                          🏷️ View Token Asset on Stellar Expert ↗
+                          View latest transaction on Stellar Expert -&gt;
                         </a>
                       )}
-                      {stellar_expert_registry_url && (
+                      {secondaryRegistryUrl && (
                         <a
-                          href={stellar_expert_registry_url}
+                          href={secondaryRegistryUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
@@ -210,9 +214,9 @@ export default function ReceivableDetail({ walletAddress, onConnect, onOpenLogin
                           📄 Registration TX on Stellar Expert ↗
                         </a>
                       )}
-                      {stellar_expert_mint_url && (
+                      {secondaryMintUrl && (
                         <a
-                          href={stellar_expert_mint_url}
+                          href={secondaryMintUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{ color: 'var(--color-saffron)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}

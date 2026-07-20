@@ -31,13 +31,29 @@ const STELLAR_EXPERT_BASE = NETWORK === 'mainnet'
   : 'https://stellar.expert/explorer/testnet';
 
 function stellarExpertTx(hash) {
-  if (!hash || hash.startsWith('demo_')) return null;
+  if (!isStellarTxHash(hash)) return null;
   return `${STELLAR_EXPERT_BASE}/tx/${hash}`;
+}
+
+function isStellarTxHash(hash) {
+  return typeof hash === 'string' && /^[a-f0-9]{64}$/i.test(hash);
 }
 
 function stellarExpertAsset(assetCode, issuerPublicKey) {
   if (!assetCode || !issuerPublicKey || issuerPublicKey.startsWith('demo')) return null;
   return `${STELLAR_EXPERT_BASE}/asset/${assetCode}-${issuerPublicKey}`;
+}
+
+function stellarExpertReceivableLinks(rec, issuerPublicKey) {
+  const registryUrl = stellarExpertTx(rec.registry_tx_hash);
+  const mintUrl = stellarExpertTx(rec.mint_tx_hash);
+
+  return {
+    stellar_expert_asset_url: stellarExpertAsset(rec.token_asset_code, issuerPublicKey),
+    stellar_expert_registry_url: registryUrl,
+    stellar_expert_mint_url: mintUrl,
+    stellar_expert_transaction_url: mintUrl || registryUrl,
+  };
 }
 
 const PASSPHRASE = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
@@ -77,9 +93,7 @@ router.get('/', (req, res) => {
       investments,
       issuer_public_key: issuerPk,
       // Stellar Expert deep links — null when demo/unavailable
-      stellar_expert_asset_url: stellarExpertAsset(r.token_asset_code, issuerPk),
-      stellar_expert_registry_url: stellarExpertTx(r.registry_tx_hash),
-      stellar_expert_mint_url: stellarExpertTx(r.mint_tx_hash),
+      ...stellarExpertReceivableLinks(r, issuerPk),
     };
   });
 
@@ -113,9 +127,7 @@ router.get('/:id', (req, res) => {
     events,
     issuer_public_key: process.env.ISSUER_PUBLIC_KEY || 'demo',
     // Stellar Expert deep links
-    stellar_expert_asset_url: stellarExpertAsset(rec.token_asset_code, process.env.ISSUER_PUBLIC_KEY),
-    stellar_expert_registry_url: stellarExpertTx(rec.registry_tx_hash),
-    stellar_expert_mint_url: stellarExpertTx(rec.mint_tx_hash),
+    ...stellarExpertReceivableLinks(rec, process.env.ISSUER_PUBLIC_KEY),
   });
 });
 
@@ -326,7 +338,9 @@ router.post('/:id/attest', async (req, res, next) => {
         attest_tx: attestTxHash,
         mint_tx: mintTxHash,
         message: 'Threshold met — receivable token minted!',
+        stellar_expert_url: stellarExpertTx(mintTxHash) || stellarExpertTx(attestTxHash),
         stellar_expert_tx_url: stellarExpertTx(mintTxHash),
+        stellar_expert_transaction_url: stellarExpertTx(mintTxHash) || stellarExpertTx(attestTxHash),
         stellar_expert_asset_url: stellarExpertAsset(assetCode, process.env.ISSUER_PUBLIC_KEY),
       });
     }
@@ -394,9 +408,7 @@ router.post('/:id/list-sale', async (req, res, next) => {
       status: 'active',
       list_tx: listTxHash,
       message: 'Listed for fractional sale',
-      stellar_expert_url: listTxHash && !listTxHash.startsWith('demo_')
-        ? `https://stellar.expert/explorer/testnet/tx/${listTxHash}`
-        : null,
+      stellar_expert_url: stellarExpertTx(listTxHash),
     });
   } catch (err) {
     next(err);
@@ -546,9 +558,7 @@ router.post('/:id/buy-share', async (req, res, next) => {
       discount_bps: discountBps,
       tx_hash: purchaseTxHash,
       message: 'Share purchased successfully',
-      stellar_expert_url: purchaseTxHash && !purchaseTxHash.startsWith('demo_')
-        ? `https://stellar.expert/explorer/testnet/tx/${purchaseTxHash}`
-        : null,
+      stellar_expert_url: stellarExpertTx(purchaseTxHash),
     });
   } catch (err) {
     next(err);

@@ -430,6 +430,14 @@ function ExporterReceivableRow({ rec, walletAddress }) {
   const normalizedStatus = rec.status === 'settled_pending' ? 'active' : rec.status;
   const stageIdx = LIFECYCLE.indexOf(normalizedStatus);
   const pct = stageIdx < 0 ? 0 : Math.round(((stageIdx + 1) / LIFECYCLE.length) * 100);
+  const primaryStellarTxUrl =
+    rec.stellar_expert_transaction_url ||
+    rec.stellar_expert_mint_url ||
+    rec.stellar_expert_registry_url;
+  const secondaryRegistryTxUrl =
+    rec.stellar_expert_registry_url !== primaryStellarTxUrl ? rec.stellar_expert_registry_url : null;
+  const secondaryMintTxUrl =
+    rec.stellar_expert_mint_url !== primaryStellarTxUrl ? rec.stellar_expert_mint_url : null;
 
   const statusLabel = {
     pending: 'Pending Attestation',
@@ -494,30 +502,32 @@ function ExporterReceivableRow({ rec, walletAddress }) {
       <AttestationMini count={rec.attestation_count || 0} required={2} />
 
       {/* Token asset code with Stellar Expert link */}
-      {rec.token_asset_code && (
+      {(rec.token_asset_code || primaryStellarTxUrl) && (
         <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-          <span className="badge badge-attested" style={{ fontSize: '0.6rem' }}>{rec.token_asset_code}</span>
+          {rec.token_asset_code && (
+            <span className="badge badge-attested" style={{ fontSize: '0.6rem' }}>{rec.token_asset_code}</span>
+          )}
 
-          {/* Asset page on Stellar Expert */}
-          {rec.stellar_expert_asset_url ? (
+          {/* Primary on-chain transaction on Stellar Expert */}
+          {primaryStellarTxUrl ? (
             <a
-              href={rec.stellar_expert_asset_url}
+              href={primaryStellarTxUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-ui-xs"
               style={{ color: 'var(--color-teal-light)', textDecoration: 'underline' }}
-              title="View token holders & balances on Stellar Expert"
+              title="View the latest on-chain transaction on Stellar Expert"
             >
-              View on Stellar ↗
+              View transaction on Stellar -&gt;
             </a>
-          ) : (
+          ) : rec.token_asset_code ? (
             <span className="text-ui-xs text-muted">(local demo)</span>
-          )}
+          ) : null}
 
           {/* Registration contract TX */}
-          {rec.stellar_expert_registry_url && (
+          {secondaryRegistryTxUrl && (
             <a
-              href={rec.stellar_expert_registry_url}
+              href={secondaryRegistryTxUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-ui-xs"
@@ -529,9 +539,9 @@ function ExporterReceivableRow({ rec, walletAddress }) {
           )}
 
           {/* Mint TX */}
-          {rec.stellar_expert_mint_url && (
+          {secondaryMintTxUrl && (
             <a
-              href={rec.stellar_expert_mint_url}
+              href={secondaryMintTxUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-ui-xs"
