@@ -51,6 +51,8 @@ export async function initDb() {
       attestation_count   INTEGER DEFAULT 0,
       discount_bps        INTEGER,
       token_asset_code    TEXT,
+      registry_tx_hash    TEXT,   -- Stellar tx hash of on-chain registration
+      mint_tx_hash        TEXT,   -- Stellar tx hash of token mint (Horizon)
       created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -114,6 +116,16 @@ export async function initDb() {
       created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // ── Migration: add new columns to existing DBs ──────────────────
+  // ALTER TABLE ADD COLUMN is idempotent-safe with try/catch.
+  const migrations = [
+    "ALTER TABLE receivables ADD COLUMN registry_tx_hash TEXT",
+    "ALTER TABLE receivables ADD COLUMN mint_tx_hash TEXT",
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch { /* column already exists — safe to ignore */ }
+  }
 
   // ── Auto-seed on cold start ───────────────────────────────────
   // If the receivables table is empty (fresh DB / after redeploy),

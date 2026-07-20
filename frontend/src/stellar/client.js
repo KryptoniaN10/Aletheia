@@ -291,7 +291,7 @@ export const oracleApi = {
 
 export const stellarApi = {
   getAccount: (address) => apiCall(`/api/stellar/account/${address}`),
-  getOffers:  (address) => apiCall(`/api/stellar/dex/offers/${address}`),
+  getOffers: (address) => apiCall(`/api/stellar/dex/offers/${address}`),
   getOrderbook: (params) => {
     const qs = new URLSearchParams(params).toString();
     return apiCall(`/api/stellar/dex/orderbook?${qs}`);
@@ -353,19 +353,19 @@ export function daysUntil(dateStr) {
  * Status → badge class mapping
  */
 export const STATUS_BADGE = {
-  pending:  'badge-pending',
+  pending: 'badge-pending',
   attested: 'badge-attested',
-  active:   'badge-active',
-  settled:  'badge-settled',
+  active: 'badge-active',
+  settled: 'badge-settled',
   settled_pending: 'badge-active',
   clawback: 'badge-clawback',
 };
 
 export const STATUS_LABEL = {
-  pending:  'Pending',
+  pending: 'Pending',
   attested: 'Attested',
-  active:   'For Sale',
+  active: 'For Sale',
   settled_pending: 'Payout Ready',
-  settled:  'Settled',
+  settled: 'Settled',
   clawback: 'Clawback',
 };

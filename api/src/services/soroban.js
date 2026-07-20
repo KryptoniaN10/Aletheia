@@ -14,9 +14,9 @@
 
 import { SorobanRpc, TransactionBuilder, Contract, xdr, Address, nativeToScVal, scValToNative, BASE_FEE, Keypair, Networks } from '@stellar/stellar-sdk';
 
-const RPC_URL     = process.env.STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
-const PASSPHRASE  = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
-const rpcServer   = new SorobanRpc.Server(RPC_URL, { allowHttp: false });
+const RPC_URL = process.env.STELLAR_RPC_URL || 'https://soroban-testnet.stellar.org';
+const PASSPHRASE = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
+const rpcServer = new SorobanRpc.Server(RPC_URL, { allowHttp: false });
 
 // ── Argument helpers ─────────────────────────────────────────
 

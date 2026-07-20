@@ -63,7 +63,11 @@ export default function ReceivableDetail({ walletAddress, onConnect }) {
     ipfs_cid,
     token_asset_code,
     investments = [],
-    created_at
+    created_at,
+    // Stellar Expert deep links (populated from real on-chain tx hashes)
+    stellar_expert_asset_url,
+    stellar_expert_registry_url,
+    stellar_expert_mint_url,
   } = receivable;
 
   const totalInvested = investments.reduce((s, i) => s + (i.share_cents / 100), 0);
@@ -169,6 +173,45 @@ export default function ReceivableDetail({ walletAddress, onConnect }) {
                   <span className="form-label" style={{ fontSize: '0.65rem', display: 'block', marginBottom: '4px' }}>IPFS Reference CID</span>
                   <span className="monospace text-ui-xs text-secondary" style={{ wordBreak: 'break-all' }}>{ipfs_cid || 'Unassigned'}</span>
                 </div>
+
+                {/* Stellar Expert on-chain links */}
+                {(stellar_expert_asset_url || stellar_expert_registry_url || stellar_expert_mint_url) && (
+                  <div style={{ background: 'var(--color-bg-elevated)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(0,201,167,0.2)' }}>
+                    <span className="form-label" style={{ fontSize: '0.65rem', display: 'block', marginBottom: '8px' }}>Stellar Testnet Transactions</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {stellar_expert_asset_url && (
+                        <a
+                          href={stellar_expert_asset_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--color-teal-light)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          🏷️ View Token Asset on Stellar Expert ↗
+                        </a>
+                      )}
+                      {stellar_expert_registry_url && (
+                        <a
+                          href={stellar_expert_registry_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          📄 Registration TX on Stellar Expert ↗
+                        </a>
+                      )}
+                      {stellar_expert_mint_url && (
+                        <a
+                          href={stellar_expert_mint_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--color-saffron)', fontSize: '0.75rem', textDecoration: 'underline', display: 'flex', alignItems: 'center', gap: 4 }}
+                        >
+                          🪙 Token Mint TX on Stellar Expert ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -260,7 +303,19 @@ export default function ReceivableDetail({ walletAddress, onConnect }) {
                       {formatUsd(inv.payment_cents)}
                     </td>
                     <td style={{ padding: '12px' }} className="monospace text-muted">
-                      {inv.tx_hash ? `${inv.tx_hash.slice(0, 8)}...` : 'Demo Mode'}
+                      {inv.tx_hash && !inv.tx_hash.startsWith('demo') ? (
+                        <a
+                          href={`https://stellar.expert/explorer/testnet/tx/${inv.tx_hash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--color-teal-light)', textDecoration: 'underline', fontSize: '0.75rem' }}
+                          title={inv.tx_hash}
+                        >
+                          {inv.tx_hash.slice(0, 8)}… ↗
+                        </a>
+                      ) : (
+                        <span style={{ opacity: 0.5 }}>{inv.tx_hash ? `${inv.tx_hash.slice(0, 8)}...` : 'Demo Mode'}</span>
+                      )}
                     </td>
                   </tr>
                 ))}

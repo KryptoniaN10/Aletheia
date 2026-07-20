@@ -200,7 +200,7 @@ export default function SharePurchaseModal({ receivable, investorAddress, onClos
         ) : (
           <div className="alert alert-info" style={{ marginBottom: 'var(--space-4)' }}>
             <span className="text-ui-sm">
-              Investing from: <span className="monospace">{investorAddress.slice(0,6)}...{investorAddress.slice(-4)}</span>
+              Investing from: <span className="monospace">{investorAddress.slice(0, 6)}...{investorAddress.slice(-4)}</span>
               {' '}· KYC required to receive receivable tokens
             </span>
           </div>

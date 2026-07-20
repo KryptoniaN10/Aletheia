@@ -348,6 +348,16 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
                     📋 <strong>Next Step:</strong> Share your receivable hash with 2 of 3 attestors:<br />
                     <span className="text-ui-xs" style={{ opacity: 0.8 }}>Logistics Partner · Export Council · NBFC</span>
                   </div>
+                  {submitted.stellar_expert_url && (
+                    <a
+                      href={submitted.stellar_expert_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'block', marginTop: 8, color: 'var(--color-teal-light)', fontSize: '0.75rem', textDecoration: 'underline' }}
+                    >
+                      📄 View Registration TX on Stellar Expert ↗
+                    </a>
+                  )}
                 </div>
 
                 <div className="flex gap-2">
@@ -485,20 +495,51 @@ function ExporterReceivableRow({ rec, walletAddress }) {
 
       {/* Token asset code with Stellar Expert link */}
       {rec.token_asset_code && (
-        <div className="flex items-center gap-2" style={{ marginTop: 'var(--space-2)' }}>
+        <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
           <span className="badge badge-attested" style={{ fontSize: '0.6rem' }}>{rec.token_asset_code}</span>
-          {rec.issuer_public_key && !rec.issuer_public_key.startsWith('demo') ? (
+
+          {/* Asset page on Stellar Expert */}
+          {rec.stellar_expert_asset_url ? (
             <a
-              href={`https://stellar.expert/explorer/testnet/asset/${rec.token_asset_code}-${rec.issuer_public_key}`}
+              href={rec.stellar_expert_asset_url}
               target="_blank"
               rel="noopener noreferrer"
               className="text-ui-xs"
               style={{ color: 'var(--color-teal-light)', textDecoration: 'underline' }}
+              title="View token holders & balances on Stellar Expert"
             >
               View on Stellar ↗
             </a>
           ) : (
             <span className="text-ui-xs text-muted">(local demo)</span>
+          )}
+
+          {/* Registration contract TX */}
+          {rec.stellar_expert_registry_url && (
+            <a
+              href={rec.stellar_expert_registry_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-ui-xs"
+              style={{ color: 'var(--color-text-muted)', textDecoration: 'underline' }}
+              title="On-chain registration transaction"
+            >
+              📄 Reg TX ↗
+            </a>
+          )}
+
+          {/* Mint TX */}
+          {rec.stellar_expert_mint_url && (
+            <a
+              href={rec.stellar_expert_mint_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-ui-xs"
+              style={{ color: 'var(--color-saffron)', textDecoration: 'underline' }}
+              title="Token mint transaction — issuer account"
+            >
+              🪙 Mint TX ↗
+            </a>
           )}
         </div>
       )}

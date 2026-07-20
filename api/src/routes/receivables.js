@@ -25,6 +25,21 @@ import {
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+const NETWORK = process.env.STELLAR_NETWORK || 'testnet';
+const STELLAR_EXPERT_BASE = NETWORK === 'mainnet'
+  ? 'https://stellar.expert/explorer/public'
+  : 'https://stellar.expert/explorer/testnet';
+
+function stellarExpertTx(hash) {
+  if (!hash || hash.startsWith('demo_')) return null;
+  return `${STELLAR_EXPERT_BASE}/tx/${hash}`;
+}
+
+function stellarExpertAsset(assetCode, issuerPublicKey) {
+  if (!assetCode || !issuerPublicKey || issuerPublicKey.startsWith('demo')) return null;
+  return `${STELLAR_EXPERT_BASE}/asset/${assetCode}-${issuerPublicKey}`;
+}
+
 const PASSPHRASE = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
 const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
 
@@ -55,11 +70,16 @@ router.get('/', (req, res) => {
     const investments = db
       .prepare('SELECT * FROM investments WHERE receivable_id = ?')
       .all(r.id);
+    const issuerPk = process.env.ISSUER_PUBLIC_KEY || 'demo';
     return {
       ...r,
       attestations,
       investments,
-      issuer_public_key: process.env.ISSUER_PUBLIC_KEY || 'demo',
+      issuer_public_key: issuerPk,
+      // Stellar Expert deep links — null when demo/unavailable
+      stellar_expert_asset_url: stellarExpertAsset(r.token_asset_code, issuerPk),
+      stellar_expert_registry_url: stellarExpertTx(r.registry_tx_hash),
+      stellar_expert_mint_url: stellarExpertTx(r.mint_tx_hash),
     };
   });
 
@@ -92,6 +112,10 @@ router.get('/:id', (req, res) => {
     investments,
     events,
     issuer_public_key: process.env.ISSUER_PUBLIC_KEY || 'demo',
+    // Stellar Expert deep links
+    stellar_expert_asset_url: stellarExpertAsset(rec.token_asset_code, process.env.ISSUER_PUBLIC_KEY),
+    stellar_expert_registry_url: stellarExpertTx(rec.registry_tx_hash),
+    stellar_expert_mint_url: stellarExpertTx(rec.mint_tx_hash),
   });
 });
 
@@ -158,11 +182,18 @@ router.post('/register', upload.single('document'), async (req, res, next) => {
       );
       registryTxHash = txHash;
       chainId = onChainResult;
+      console.log(`[register] On-chain registration OK — tx: ${registryTxHash}`);
+      // Persist both chain_id and registry_tx_hash
       if (chainId) {
-        db.prepare('UPDATE receivables SET chain_id = ? WHERE id = ?').run(String(chainId), newId);
+        db.prepare('UPDATE receivables SET chain_id = ?, registry_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(String(chainId), registryTxHash, newId);
+      } else if (registryTxHash && !registryTxHash.startsWith('demo_')) {
+        db.prepare('UPDATE receivables SET registry_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(registryTxHash, newId);
       }
     } catch (chainErr) {
-      console.warn('[register] On-chain call failed (demo ok):', chainErr.message);
+      console.error('[register] On-chain call FAILED (demo fallback active):', chainErr.message);
+      console.error(chainErr.stack);
     }
 
     res.status(201).json({
@@ -174,9 +205,7 @@ router.post('/register', upload.single('document'), async (req, res, next) => {
       registry_tx: registryTxHash,
       status: 'pending',
       message: 'Receivable registered. Awaiting 2-of-3 attestations.',
-      stellar_expert_url: registryTxHash && !registryTxHash.startsWith('demo_')
-        ? `https://stellar.expert/explorer/testnet/tx/${registryTxHash}`
-        : null,
+      stellar_expert_url: stellarExpertTx(registryTxHash),
     });
   } catch (err) {
     next(err);
@@ -240,8 +269,10 @@ router.post('/:id/attest', async (req, res, next) => {
         "UPDATE receivables SET status = 'attested', token_asset_code = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).run(assetCode, receivableId);
 
-      // Mint: issue 1 token to the exporter (face value = 1 unit)
-      // In production: issue face_value_cents / 100 units at $1 each
+      // Mint: issue face-value tokens to the exporter.
+      // The issuer account must already have AUTH_REQUIRED | AUTH_REVOCABLE | CLAWBACK_ENABLED (flags 1|2|8=11).
+      // We send setOptions first in the same tx to ensure the flags are set,
+      // then payment to issue the tokens.
       let mintTxHash = null;
       if (process.env.ISSUER_SECRET_KEY) {
         try {
@@ -253,11 +284,12 @@ router.post('/:id/attest', async (req, res, next) => {
             fee: BASE_FEE,
             networkPassphrase: PASSPHRASE,
           })
-            // Set AUTH_REQUIRED + AUTH_REVOCABLE + CLAWBACK_ENABLED flags
+            // Set AUTH_REQUIRED(1) | AUTH_REVOCABLE(2) | CLAWBACK_ENABLED(8) = 11
+            // This is the correct issuer-account flag set for controlled asset issuance.
             .addOperation(Operation.setOptions({
-              setFlags: 7, // AUTH_REQUIRED(1) | AUTH_REVOCABLE(2) | AUTH_CLAWBACK_ENABLED(4) via asset flags
+              setFlags: 11, // 1 | 2 | 8 — was incorrectly 7 (used LOW_THRESHOLD flag instead of CLAWBACK)
             }))
-            // Issue token to exporter (represents the receivable)
+            // Issue token to exporter (represents the receivable face value)
             .addOperation(Operation.payment({
               destination: rec.exporter_address,
               asset: receivableAsset,
@@ -269,10 +301,21 @@ router.post('/:id/attest', async (req, res, next) => {
           mintTx.sign(issuerKp);
           const mintResult = await horizonServer.submitTransaction(mintTx);
           mintTxHash = mintResult.hash;
+          console.log(`[attest] Token minted on Stellar testnet — asset: ${assetCode}, tx: ${mintTxHash}`);
+
+          // Persist the mint tx hash so the frontend can link to Stellar Expert
+          db.prepare('UPDATE receivables SET mint_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+            .run(mintTxHash, receivableId);
         } catch (mintErr) {
-          // Stellar asset flags op needs the issuer account to not already have those flags
-          // Don't fail the whole attestation — this is handled at asset level not account level
-          console.warn('[attest] Mint tx failed (flag already set or demo):', mintErr.message);
+          // Log full error so we can diagnose — common causes:
+          // - Exporter account has no trustline for the asset
+          // - Issuer account has insufficient XLM
+          // - setOptions flags already set (op_already_exists) — non-fatal
+          console.error('[attest] Mint tx FAILED:', mintErr.message);
+          if (mintErr.response?.data?.extras?.result_codes) {
+            console.error('[attest] Horizon result codes:', JSON.stringify(mintErr.response.data.extras.result_codes));
+          }
+          console.error(mintErr.stack);
         }
       }
 
@@ -283,9 +326,8 @@ router.post('/:id/attest', async (req, res, next) => {
         attest_tx: attestTxHash,
         mint_tx: mintTxHash,
         message: 'Threshold met — receivable token minted!',
-        stellar_expert_url: mintTxHash && !mintTxHash.startsWith('demo_')
-          ? `https://stellar.expert/explorer/testnet/tx/${mintTxHash}`
-          : null,
+        stellar_expert_tx_url: stellarExpertTx(mintTxHash),
+        stellar_expert_asset_url: stellarExpertAsset(assetCode, process.env.ISSUER_PUBLIC_KEY),
       });
     }
 
