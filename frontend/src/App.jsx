@@ -68,7 +68,7 @@ export default function App() {
 
     const resolvedUserId = userId || localStorage.getItem('userId');
     if (resolvedUserId && address && !address.startsWith('USER_')) {
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const apiBase = '';
       fetch(`${apiBase}/api/auth/users/${resolvedUserId}/wallet`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
