@@ -140,7 +140,12 @@ export default function InvestorDashboard({ walletAddress, onConnect }) {
 
             {/* Holdings Table */}
             <div className="card">
-              <h3 style={{ fontFamily: 'var(--font-display)', marginBottom: 'var(--space-4)' }}>Your Active Positions</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+                <h3 style={{ fontFamily: 'var(--font-display)', margin: 0 }}>Your Active Positions</h3>
+                {myInvestments.length > 0 && (
+                  <Link to="/marketplace" className="btn btn-primary btn-sm">Explore Marketplace</Link>
+                )}
+              </div>
               
               {loading ? (
                 <div className="skeleton" style={{ height: '150px' }} />

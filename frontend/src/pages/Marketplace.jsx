@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useReceivables } from '../hooks/useReceivables.js';
 import ReceivableCard from '../components/ReceivableCard.jsx';
 
 export default function Marketplace() {
   const { receivables, loading, error } = useReceivables({}, 10000);
   const navigate = useNavigate();
+  const location = useLocation();
+  const isMarketplaceFromHome = location.state?.fromHome;
   
   const [commodityFilter, setCommodityFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -133,7 +135,7 @@ export default function Marketplace() {
               <ReceivableCard 
                 key={receivable.id} 
                 receivable={receivable} 
-                onClick={() => navigate(`/receivable/${receivable.id}`)}
+                onClick={() => navigate(`/receivable/${receivable.id}`, { state: { fromHome: isMarketplaceFromHome } })}
                 showInvest={receivable.status === 'active'}
               />
             ))}

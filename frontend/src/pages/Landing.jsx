@@ -81,7 +81,7 @@ export default function Landing({ walletAddress, onConnect, onOpenLogin }) {
               marginBottom: 'var(--space-6)' 
             }}
           >
-            <Link to="/marketplace" className="btn btn-primary btn-lg">
+            <Link to="/marketplace" state={{ fromHome: true }} className="btn btn-primary btn-lg">
               Marketplace
             </Link>
             <button onClick={onOpenLogin} className="btn btn-outline btn-lg">

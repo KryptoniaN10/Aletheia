@@ -5,7 +5,21 @@ export default function NetworkStatusIndicator() {
   const isTestnet = network.toLowerCase() === 'testnet';
 
   return (
-    <div className="network-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+    <div 
+      className="network-badge" 
+      style={{ 
+        display: 'inline-flex', 
+        alignItems: 'center', 
+        gap: '6px',
+        background: isTestnet ? 'rgba(196, 154, 69, 0.08)' : 'rgba(92, 125, 100, 0.08)',
+        border: isTestnet ? '1px solid rgba(196, 154, 69, 0.25)' : '1px solid rgba(92, 125, 100, 0.25)',
+        padding: '6px 14px',
+        borderRadius: '999px',
+        color: isTestnet ? '#8f6e29' : 'var(--color-green)',
+        fontSize: '0.75rem',
+        fontWeight: 600
+      }}
+    >
       <span 
         className="network-badge-dot" 
         style={{
@@ -16,7 +30,7 @@ export default function NetworkStatusIndicator() {
           display: 'inline-block'
         }} 
       />
-      <span style={{ textTransform: 'capitalize', fontSize: '0.75rem', fontWeight: 600 }}>
+      <span style={{ textTransform: 'capitalize', fontSize: '0.75rem', fontWeight: 700 }}>
         {network}
       </span>
     </div>
