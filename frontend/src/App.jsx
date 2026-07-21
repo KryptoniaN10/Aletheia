@@ -11,12 +11,13 @@ import HowItWorks from './pages/HowItWorks.jsx';
 import Login from './pages/Login.jsx';
 import Navbar from './components/Navbar.jsx';
 import StellarWallet from './pages/StellarWallet.jsx';
+import Profile from './pages/Profile.jsx';
 import Footer from './components/Footer.jsx';
 import ChatbotWidget from './components/ChatbotWidget.jsx';
 import { connectFreighter, getFreighterPublicKey } from './stellar/client.js';
 
 const ProtectedRoute = ({ element, role, walletAddress, userRole, setShowLoginModal }) => {
-  const isAuthorized = walletAddress && userRole === role;
+  const isAuthorized = userRole === role;
   useEffect(() => {
     if (!isAuthorized) {
       setShowLoginModal(true);
@@ -88,10 +89,12 @@ export default function App() {
   };
 
   const handleDisconnectWallet = () => {
-    const baseAddress = localStorage.getItem('sessionAddress');
-    if (baseAddress && baseAddress !== walletAddress) {
-      setWalletAddress(baseAddress);
-      localStorage.setItem('userAddress', baseAddress);
+    const userId = localStorage.getItem('userId');
+    const fallbackAddr = userId && userRole ? `USER_${userId}_${userRole.toUpperCase()}` : null;
+    
+    if (fallbackAddr) {
+      setWalletAddress(fallbackAddr);
+      localStorage.setItem('userAddress', fallbackAddr);
     } else {
       handleDisconnect();
     }
@@ -196,6 +199,7 @@ export default function App() {
           <Route path="/exporter" element={<ProtectedRoute element={<ExporterDashboard walletAddress={walletAddress} onConnect={handleConnect} />} role="exporter" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/wallet" element={<ProtectedRoute element={<StellarWallet walletAddress={walletAddress} onConnect={handleConnect} />} role={userRole} walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
+          <Route path="/profile" element={<Profile walletAddress={walletAddress} userRole={userRole} />} />
           <Route path="/login" element={<Login isOpen={true} onClose={() => navigate(-1)} onLogin={handleLogin} />} />
           <Route path="/admin" element={<ProtectedRoute element={<AdminPanel walletAddress={walletAddress} />} role="admin" walletAddress={walletAddress} userRole={userRole} setShowLoginModal={setShowLoginModal} />} />
           <Route path="*" element={<NotFound />} />

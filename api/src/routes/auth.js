@@ -99,6 +99,10 @@ router.post('/login', (req, res) => {
     full_name: user.full_name,
     company_name: user.company_name,
     wallet_address: user.wallet_address,
+    profile_pic: user.profile_pic,
+    phone: user.phone,
+    bio: user.bio,
+    location: user.location,
     message: 'Login successful.'
   });
 });
@@ -293,6 +297,101 @@ router.put('/users/:id/wallet', (req, res) => {
 
   db.prepare('UPDATE users SET wallet_address = ? WHERE id = ?').run(wallet_address, id);
   res.json({ message: 'User wallet address updated successfully.', id, wallet_address });
+});
+
+// ── Get user details ──────────────────────────────────────────
+router.get('/users/:id', (req, res) => {
+  const db = getDb();
+  const { id } = req.params;
+
+  if (id === '0' || id === 'admin') {
+    return res.json({
+      id: 0,
+      username: 'admin',
+      email: 'admin@aletheia.io',
+      role: 'admin',
+      full_name: 'System Admin',
+      company_name: 'Aletheia Network',
+      wallet_address: 'GDEMO5LOGISTICS1PARTNER1ALETHEIA1FREIGHT1111111111111111',
+      profile_pic: null,
+      phone: '',
+      bio: 'Platform Administrator',
+      location: 'Global'
+    });
+  }
+
+  const user = db.prepare('SELECT id, username, email, role, full_name, company_name, wallet_address, profile_pic, phone, bio, location, created_at FROM users WHERE id = ?').get(id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  res.json(user);
+});
+
+// ── Update user profile details ──────────────────────────────
+router.put('/users/:id/profile', (req, res) => {
+  const db = getDb();
+  const { id } = req.params;
+  const { full_name, company_name, phone, bio, location, profile_pic } = req.body;
+
+  if (id === '0' || id === 'admin') {
+    return res.json({ message: 'Admin profile updated (session only).' });
+  }
+
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  db.prepare(`
+    UPDATE users 
+    SET full_name = ?, company_name = ?, phone = ?, bio = ?, location = ?, profile_pic = ?
+    WHERE id = ?
+  `).run(
+    full_name ?? null,
+    company_name ?? null,
+    phone ?? null,
+    bio ?? null,
+    location ?? null,
+    profile_pic ?? null,
+    id
+  );
+
+  const updatedUser = db.prepare('SELECT id, username, email, role, full_name, company_name, wallet_address, profile_pic, phone, bio, location, created_at FROM users WHERE id = ?').get(id);
+  res.json({ message: 'Profile updated successfully.', user: updatedUser });
+});
+
+// ── Change user password ─────────────────────────────────────
+router.put('/users/:id/password', (req, res) => {
+  const db = getDb();
+  const { id } = req.params;
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+  }
+
+  if (id === '0' || id === 'admin') {
+    return res.status(400).json({ error: 'Admin demo account password cannot be changed.' });
+  }
+
+  const user = db.prepare('SELECT id, password_hash FROM users WHERE id = ?').get(id);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (!verifyPassword(currentPassword, user.password_hash)) {
+    return res.status(401).json({ error: 'Current password is incorrect.' });
+  }
+
+  const newHash = hashPassword(newPassword);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, id);
+
+  res.json({ message: 'Password changed successfully.' });
 });
 
 // ── Mock SEP-24 Interactive KYC Page ─────────────────────────

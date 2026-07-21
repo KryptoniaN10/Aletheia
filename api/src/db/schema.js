@@ -114,6 +114,10 @@ export async function initDb() {
       full_name       TEXT,
       company_name    TEXT,
       wallet_address  TEXT,
+      profile_pic     TEXT,
+      phone           TEXT,
+      bio             TEXT,
+      location        TEXT,
       created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
@@ -124,6 +128,10 @@ export async function initDb() {
     "ALTER TABLE receivables ADD COLUMN registry_tx_hash TEXT",
     "ALTER TABLE receivables ADD COLUMN mint_tx_hash TEXT",
     "ALTER TABLE receivables ADD COLUMN list_tx_hash TEXT",
+    "ALTER TABLE users ADD COLUMN profile_pic TEXT",
+    "ALTER TABLE users ADD COLUMN phone TEXT",
+    "ALTER TABLE users ADD COLUMN bio TEXT",
+    "ALTER TABLE users ADD COLUMN location TEXT",
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch { /* column already exists — safe to ignore */ }

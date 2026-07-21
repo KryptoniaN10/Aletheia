@@ -24,10 +24,29 @@ export default function InvestorDashboard({ walletAddress, onConnect }) {
   const expectedProfit = totalFaceValue - totalDeployed;
   const avgYieldPct = totalDeployed > 0 ? ((expectedProfit / totalDeployed) * 100).toFixed(1) : 0;
 
-  // KYC status check
+  // KYC status check & real-time polling for admin approval
   useEffect(() => {
     if (!walletAddress) return;
-    authApi.checkWalletKyc(walletAddress).then(setKycStatus).catch(() => {});
+
+    let isMounted = true;
+    const checkKyc = () => {
+      authApi.checkWalletKyc(walletAddress)
+        .then((res) => {
+          if (isMounted) setKycStatus(res);
+        })
+        .catch(() => {});
+    };
+
+    checkKyc();
+
+    const interval = setInterval(() => {
+      checkKyc();
+    }, 3000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [walletAddress]);
 
   async function handleKycSubmit(e) {
@@ -72,7 +91,7 @@ export default function InvestorDashboard({ walletAddress, onConnect }) {
         ) : (
           <div className="flex flex-col gap-6">
             {/* KYC Banner */}
-            {kycStatus?.kyc_status !== 'approved' && (
+            {kycStatus && !kycStatus.approved && kycStatus.kyc_status !== 'approved' && (
               <div 
                 className="card" 
                 style={{ 

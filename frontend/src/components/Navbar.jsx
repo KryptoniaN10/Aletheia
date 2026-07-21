@@ -98,6 +98,13 @@ export default function Navbar({ walletAddress, userRole, connecting, onConnect,
               </NavLink>
             </li>
           )}
+          {!isMarketplaceFromHome && !isLandingPage && walletAddress && (
+            <li>
+              <NavLink to="/profile" className={({ isActive }) => isActive ? 'active' : ''}>
+                👤 Profile
+              </NavLink>
+            </li>
+          )}
         </ul>
 
         {/* Actions */}
