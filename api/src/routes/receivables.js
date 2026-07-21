@@ -225,21 +225,11 @@ router.post('/register', upload.single('document'), async (req, res, next) => {
     } catch (chainErr) {
       console.warn('[register] On-chain call failed (demo ok):', chainErr.message);
       registryTxHash = `demo_reg_${Date.now().toString(36)}`;
+      db.prepare('UPDATE receivables SET registry_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .run(registryTxHash, newId);
     }
 
-    const info = db.prepare(`
-      INSERT INTO receivables (
-        exporter_address, exporter_name, buyer_name, buyer_country,
-        amount_usd, maturity_date, doc_hash, ipfs_cid, doc_filename,
-        iec_code, commodity, registry_tx_hash, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-    `).run(
-      exporter_address, exporter_name, buyer_name, buyer_country,
-      parseFloat(amount_usd), maturity_date, doc_hash, ipfs_cid, doc_filename,
-      iec_code, commodity, registryTxHash
-    );
-
-    const newRec = db.prepare('SELECT * FROM receivables WHERE id = ?').get(info.lastInsertRowid);
+    const newRec = db.prepare('SELECT * FROM receivables WHERE id = ?').get(newId);
     const issuerPublicKey = process.env.ISSUER_PUBLIC_KEY || (getIssuerKp()?.publicKey());
 
     res.status(201).json({
