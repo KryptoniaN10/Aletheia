@@ -31,10 +31,13 @@ const rpcServer = new SorobanRpc.Server(RPC_URL);
 
 // Issuer / admin keypair (loaded from env)
 function getIssuerKeypair() {
-  if (!process.env.ISSUER_SECRET_KEY) {
-    throw new Error('ISSUER_SECRET_KEY not set in environment');
+  if (process.env.ISSUER_SECRET_KEY) {
+    return Keypair.fromSecret(process.env.ISSUER_SECRET_KEY);
   }
-  return Keypair.fromSecret(process.env.ISSUER_SECRET_KEY);
+  if (process.env.ISSUER_PUBLIC_KEY) {
+    return Keypair.fromPublicKey(process.env.ISSUER_PUBLIC_KEY);
+  }
+  throw new Error('ISSUER_SECRET_KEY and ISSUER_PUBLIC_KEY not set in environment');
 }
 
 function getOracleKeypair() {

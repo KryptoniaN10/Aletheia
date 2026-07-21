@@ -70,8 +70,13 @@ const PASSPHRASE = process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET;
 const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
 
 function getIssuerKp() {
-  if (!process.env.ISSUER_SECRET_KEY) return null;
-  return Keypair.fromSecret(process.env.ISSUER_SECRET_KEY);
+  if (process.env.ISSUER_SECRET_KEY) {
+    return Keypair.fromSecret(process.env.ISSUER_SECRET_KEY);
+  }
+  if (process.env.ISSUER_PUBLIC_KEY) {
+    return Keypair.fromPublicKey(process.env.ISSUER_PUBLIC_KEY);
+  }
+  return null;
 }
 
 // ── List all receivables ──────────────────────────────────────
@@ -214,65 +219,73 @@ router.post('/register', upload.single('document'), async (req, res, next) => {
         db.prepare('UPDATE receivables SET chain_id = ?, registry_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(String(chainId), registryTxHash, newId);
       } else if (registryTxHash && !registryTxHash.startsWith('demo_')) {
-        db.prepare('UPDATE receivables SET registry_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-          .run(registryTxHash, newId);
-      }
     } catch (chainErr) {
-      console.error('[register] On-chain call FAILED (demo fallback active):', chainErr.message);
-      console.error(chainErr.stack);
+      console.warn('[register] On-chain call failed (demo ok):', chainErr.message);
+      registryTxHash = `demo_reg_${Date.now().toString(36)}`;
     }
 
+    const info = db.prepare(`
+      INSERT INTO receivables (
+        exporter_address, exporter_name, buyer_name, buyer_country,
+        amount_usd, maturity_date, doc_hash, ipfs_cid, doc_filename,
+        iec_code, commodity, registry_tx_hash, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    `).run(
+      exporter_address, exporter_name, buyer_name, buyer_country,
+      parseFloat(amount_usd), maturity_date, doc_hash, ipfs_cid, doc_filename,
+      iec_code, commodity, registryTxHash
+    );
+
+    const newRec = db.prepare('SELECT * FROM receivables WHERE id = ?').get(info.lastInsertRowid);
+    const issuerPublicKey = process.env.ISSUER_PUBLIC_KEY || (getIssuerKp()?.publicKey());
+
     res.status(201).json({
-      id: newId,
-      doc_hash: docHash,
-      ipfs_cid: cid,
-      hash_only: hashOnly,
-      chain_id: chainId,
-      registry_tx: registryTxHash,
-      status: 'pending',
-      message: 'Receivable registered. Awaiting 2-of-3 attestations.',
-      stellar_expert_url: stellarExpertTx(registryTxHash),
+      ...newRec,
+      ...stellarExpertReceivableLinks(newRec, issuerPublicKey),
     });
   } catch (err) {
     next(err);
   }
 });
 
-// ── Attest a receivable ───────────────────────────────────────
+// ── Attest a receivable (multiple judges) ─────────────────────
 router.post('/:id/attest', async (req, res, next) => {
   try {
     const db = getDb();
-    const { attestor_address, attestor_role, tx_hash } = req.body;
+    const { attestor_address, attestor_role } = req.body;
     const receivableId = parseInt(req.params.id);
-
-    if (!attestor_address) return res.status(400).json({ error: 'attestor_address required' });
 
     const rec = db.prepare('SELECT * FROM receivables WHERE id = ?').get(receivableId);
     if (!rec) return res.status(404).json({ error: 'Receivable not found' });
     if (rec.status !== 'pending') {
-      return res.status(400).json({ error: 'Receivable is not pending' });
+      return res.status(400).json({ error: 'Receivable is not in pending status' });
     }
 
-    const existing = db
-      .prepare('SELECT id FROM attestations WHERE receivable_id = ? AND attestor_address = ?')
-      .get(receivableId, attestor_address);
-    if (existing) return res.status(409).json({ error: 'Already attested' });
+    const existing = db.prepare(
+      'SELECT id FROM attestations WHERE receivable_id = ? AND attestor_address = ?'
+    ).get(receivableId, attestor_address);
 
-    // ── On-chain: ReceivableRegistry.attest() ────────────────
-    let attestTxHash = tx_hash || null;
+    if (existing) {
+      return res.status(400).json({ error: 'Already attested' });
+    }
+
+    // ── On-chain: ReceivableRegistry.attest_receivable() ──────
+    let attestTxHash = null;
     try {
       const { txHash } = await invokeContract(
         process.env.RECEIVABLE_REGISTRY_CONTRACT_ID,
-        'attest',
+        'attest_receivable',
         [
-          scAddress(attestor_address),
           scU128(receivableId),
+          scAddress(attestor_address),
+          scString(attestor_role || 'logistics'),
         ],
         process.env.ISSUER_SECRET_KEY
       );
       attestTxHash = txHash;
     } catch (chainErr) {
       console.warn('[attest] On-chain call failed (demo ok):', chainErr.message);
+      attestTxHash = `demo_attest_${Date.now().toString(36)}`;
     }
 
     db.prepare(
@@ -286,27 +299,17 @@ router.post('/:id/attest', async (req, res, next) => {
     db.prepare('UPDATE receivables SET attestation_count = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(count, receivableId);
 
-    // ── Threshold met: mint Stellar asset (or prepare a co-signed mint) ───────────────────
+    // ── Threshold met: mint Stellar asset ───────────────────
     if (count >= 2 && rec.status === 'pending') {
       const assetCode = `ML${String(receivableId).padStart(4, '0')}`;
+      db.prepare("UPDATE receivables SET status = 'attested', token_asset_code = ? WHERE id = ?")
+        .run(assetCode, receivableId);
 
-      db.prepare(
-        "UPDATE receivables SET status = 'attested', token_asset_code = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-      ).run(assetCode, receivableId);
-
-      // Mint: issue face-value tokens to the exporter.
-      // The issuer account must already have AUTH_REQUIRED | AUTH_REVOCABLE | CLAWBACK_ENABLED (flags 1|2|8=11).
-      // We send setOptions first in the same tx to ensure the flags are set,
-      // then payment to issue the tokens.
-      let mintTxHash = null;
-      // If client requested a co-sign flow, prepare a partially-signed XDR and return it
-      // to the caller so the admin (Freighter) can add their signature and submit.
-      const { co_sign, admin_address } = req.body || {};
+      const { admin_address } = req.body || {};
       const issuerKp = getIssuerKp();
 
-      if (co_sign && admin_address && issuerKp) {
+      if (admin_address && issuerKp) {
         try {
-          // Build transaction with admin as fee-payer (source account)
           const adminAccount = await horizonServer.loadAccount(admin_address);
           const receivableAsset = new Asset(assetCode, issuerKp.publicKey());
 
@@ -327,37 +330,35 @@ router.post('/:id/attest', async (req, res, next) => {
             .setTimeout(30)
             .build();
 
-          // Server signs as issuer (partial signature)
-          mintTx.sign(Keypair.fromSecret(process.env.ISSUER_SECRET_KEY));
+          if (process.env.ISSUER_SECRET_KEY) {
+            mintTx.sign(Keypair.fromSecret(process.env.ISSUER_SECRET_KEY));
+          }
 
           const preparedXdr = mintTx.toXDR();
-          // Return prepared XDR to frontend for Freighter signing and submission
           return res.json({
             attestation_count: count,
             status: 'attested',
             token_asset_code: assetCode,
             prepared_xdr: preparedXdr,
-            message: 'Threshold met — prepared partially-signed mint XDR. Sign and submit from admin wallet.',
+            message: process.env.ISSUER_SECRET_KEY 
+              ? 'Threshold met — prepared partially-signed mint XDR. Sign and submit from admin wallet.'
+              : 'Threshold met — prepared unsigned mint XDR. Sign and submit from admin wallet.',
           });
         } catch (prepErr) {
           console.error('[attest] Prepare mint XDR failed:', prepErr.message);
-          console.error(prepErr.stack);
         }
       }
 
-      // Fallback: server-side minting (existing behavior)
-      if (issuerKp) {
+      let mintTxHash = null;
+      if (process.env.ISSUER_SECRET_KEY && issuerKp) {
         try {
           const issuerAccount = await horizonServer.loadAccount(issuerKp.publicKey());
           const receivableAsset = new Asset(assetCode, issuerKp.publicKey());
-
           const mintTx = new TransactionBuilder(issuerAccount, {
             fee: BASE_FEE,
             networkPassphrase: PASSPHRASE,
           })
-            .addOperation(Operation.setOptions({
-              setFlags: 11,
-            }))
+            .addOperation(Operation.setOptions({ setFlags: 11 }))
             .addOperation(Operation.payment({
               destination: rec.exporter_address,
               asset: receivableAsset,
@@ -369,16 +370,10 @@ router.post('/:id/attest', async (req, res, next) => {
           mintTx.sign(issuerKp);
           const mintResult = await horizonServer.submitTransaction(mintTx);
           mintTxHash = mintResult.hash;
-          console.log(`[attest] Token minted on Stellar testnet — asset: ${assetCode}, tx: ${mintTxHash}`);
-
-          db.prepare('UPDATE receivables SET mint_tx_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          db.prepare('UPDATE receivables SET mint_tx_hash = ? WHERE id = ?')
             .run(mintTxHash, receivableId);
         } catch (mintErr) {
           console.error('[attest] Mint tx FAILED:', mintErr.message);
-          if (mintErr.response?.data?.extras?.result_codes) {
-            console.error('[attest] Horizon result codes:', JSON.stringify(mintErr.response.data.extras.result_codes));
-          }
-          console.error(mintErr.stack);
         }
       }
 
@@ -388,13 +383,11 @@ router.post('/:id/attest', async (req, res, next) => {
         token_asset_code: assetCode,
         attest_tx: attestTxHash,
         mint_tx: mintTxHash,
-        message: 'Threshold met — receivable token minted!',
+        message: mintTxHash ? 'Threshold met — receivable token minted!' : 'Threshold met — waiting for admin signature.',
         stellar_expert_url: stellarExpertTx(mintTxHash) || stellarExpertTx(attestTxHash),
         stellar_expert_tx_url: stellarExpertTx(mintTxHash),
         stellar_expert_transaction_url: stellarExpertTx(mintTxHash) || stellarExpertTx(attestTxHash),
-        // Only non-null when mintTxHash is a confirmed on-chain hash —
-        // prevents "The asset does not exist on the ledger" error on Stellar Expert
-        stellar_expert_asset_url: stellarExpertAsset(assetCode, process.env.ISSUER_PUBLIC_KEY, mintTxHash),
+        stellar_expert_asset_url: stellarExpertAsset(assetCode, process.env.ISSUER_PUBLIC_KEY || (issuerKp ? issuerKp.publicKey() : ''), mintTxHash),
       });
     }
 

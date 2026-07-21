@@ -190,14 +190,12 @@ router.post('/kyc/:session/approve', async (req, res, next) => {
 
     let stellarResult = { sponsored_reserve: false, trustline_authorized: false };
 
-    // ── Sponsored Reserve + Trustline Authorization ───────────
-    // When ISSUER_SECRET_KEY is set (i.e., contracts are deployed),
-    // this sponsors the trustline reserve so the investor doesn't need XLM,
-    // and authorizes the trustline so they can receive AUTH_REQUIRED tokens.
+    const issuerPublicKey = process.env.ISSUER_PUBLIC_KEY;
+    const { admin_address } = req.body || {};
+
     if (process.env.ISSUER_SECRET_KEY && process.env.FRACTIONAL_SALE_CONTRACT_ID) {
       try {
         const { Asset } = await import('@stellar/stellar-sdk');
-        const issuerPublicKey = process.env.ISSUER_PUBLIC_KEY;
 
         // Get all active receivable asset codes so we can authorize each
         const activeReceivables = db
@@ -212,6 +210,38 @@ router.post('/kyc/:session/approve', async (req, res, next) => {
       } catch (stellarErr) {
         // Non-fatal — KYC is approved in the DB regardless
         console.warn('[KYC approve] Stellar trustline step failed (demo mode ok):', stellarErr.message);
+      }
+    } else if (admin_address && issuerPublicKey) {
+      // Build allowTrust transaction for the admin to sign via Freighter
+      try {
+        const { Asset, TransactionBuilder, Operation, BASE_FEE, Networks } = await import('@stellar/stellar-sdk');
+        const activeReceivables = db
+          .prepare("SELECT token_asset_code FROM receivables WHERE status IN ('attested','active') AND token_asset_code IS NOT NULL")
+          .all();
+
+        if (activeReceivables.length > 0) {
+          const adminAccount = await horizonServer.loadAccount(admin_address);
+          const txBuilder = new TransactionBuilder(adminAccount, {
+            fee: BASE_FEE,
+            networkPassphrase: process.env.STELLAR_NETWORK_PASSPHRASE || Networks.TESTNET,
+          });
+
+          for (const rec of activeReceivables) {
+            txBuilder.addOperation(
+              Operation.allowTrust({
+                source: issuerPublicKey,
+                trustor: session.wallet_address,
+                assetCode: rec.token_asset_code,
+                authorize: true,
+              })
+            );
+          }
+
+          const tx = txBuilder.setTimeout(30).build();
+          stellarResult.prepared_xdr = tx.toXDR();
+        }
+      } catch (prepErr) {
+        console.warn('[KYC approve] Prepare allowTrust XDR failed:', prepErr.message);
       }
     }
 

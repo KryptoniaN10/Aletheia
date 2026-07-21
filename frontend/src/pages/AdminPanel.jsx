@@ -278,9 +278,19 @@ export default function AdminPanel({ walletAddress }) {
                           <div className="flex gap-2">
                             <button
                               className="btn btn-primary btn-sm"
-                              onClick={() => runAction(`kyc-approve-${session.id}`, () =>
-                                authApi.approveKyc(session.id)
-                              )}
+                              onClick={() => runAction(`kyc-approve-${session.id}`, async () => {
+                                const body = {};
+                                if (walletAddress) {
+                                  body.admin_address = walletAddress;
+                                }
+                                const resp = await authApi.approveKyc(session.id, body);
+                                if (resp && resp.prepared_xdr && walletAddress) {
+                                  const signedXdr = await signXdrWithFreighter(resp.prepared_xdr, walletAddress);
+                                  const result = await submitSignedXdr(signedXdr);
+                                  return { ...resp, tx_hash: result.hash, message: 'KYC approved and trustlines authorized on-chain!' };
+                                }
+                                return resp;
+                              })}
                               disabled={actionLoading[`kyc-approve-${session.id}`]}
                               id={`kyc-approve-${session.id}`}
                             >

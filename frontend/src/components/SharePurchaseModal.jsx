@@ -33,9 +33,9 @@ export default function SharePurchaseModal({ receivable, investorAddress, onClos
       // If we are on testnet and have a token_asset_code, check if we need to sponsor it
       if (receivable.token_asset_code) {
         try {
-          await executeSponsoredTrustline(investorAddress, receivable.token_asset_code);
+          await executeSponsoredTrustline(investorAddress, receivable.token_asset_code, receivable.issuer_public_key);
         } catch (trustlineErr) {
-          console.warn('[SharePurchase] Trustline sponsorship skipped or failed (demo mode ok):', trustlineErr.message);
+          console.warn('[SharePurchase] Trustline setup skipped or failed (demo mode ok):', trustlineErr.message);
         }
       }
 

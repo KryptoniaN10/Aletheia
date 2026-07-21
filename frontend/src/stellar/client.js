@@ -154,22 +154,46 @@ export async function signTransactionWithFreighter({ investorAddress, paymentUsd
 // ── Execute a sponsored trustline transaction ──────────────────
 // Calls the API to build a sponsored reserve trustline, signs it
 // with Freighter (beneficiary's signature), and submits it.
-export async function executeSponsoredTrustline(beneficiaryAddress, assetCode) {
+export async function executeSponsoredTrustline(beneficiaryAddress, assetCode, assetIssuer) {
   const response = await stellarApi.sponsorTrustline({
     beneficiary_address: beneficiaryAddress,
     asset_code: assetCode,
   });
 
-  if (!response.sponsored || !response.xdr) {
-    return false;
+  if (response.sponsored && response.xdr) {
+    const signedXdr = await signXdrWithFreighter(response.xdr, beneficiaryAddress);
+    // Submit to Horizon
+    const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+    const result = await horizonServer.submitTransaction(signedTx);
+    return { hash: result.hash };
+  } else {
+    // Fallback: create a standard non-sponsored trustline
+    if (!assetIssuer || assetIssuer === 'demo') {
+      console.warn('[Trustline] Cannot fallback to standard trustline because assetIssuer is missing or demo');
+      return false;
+    }
+    console.log('[Trustline] Sponsoring skipped, creating standard trustline for', assetCode);
+    const beneficiaryAccount = await horizonServer.loadAccount(beneficiaryAddress);
+    const asset = new Asset(assetCode, assetIssuer);
+
+    const tx = new TransactionBuilder(beneficiaryAccount, {
+      fee: BASE_FEE,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    })
+      .addOperation(
+        Operation.changeTrust({
+          asset,
+        })
+      )
+      .setTimeout(180)
+      .build();
+
+    const txXdr = tx.toXDR();
+    const signedXdr = await signXdrWithFreighter(txXdr, beneficiaryAddress);
+    const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+    const result = await horizonServer.submitTransaction(signedTx);
+    return { hash: result.hash };
   }
-
-  const signedXdr = await signXdrWithFreighter(response.xdr, beneficiaryAddress);
-
-  // Submit to Horizon
-  const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
-  const result = await horizonServer.submitTransaction(signedTx);
-  return { hash: result.hash };
 }
 
 // ── Horizon queries ───────────────────────────────────────────
@@ -324,7 +348,7 @@ export const authApi = {
   startKyc: (body) => apiCall('/api/auth/kyc/start', 'POST', body),
   getKycStatus: (sessionId) => apiCall(`/api/auth/kyc/${sessionId}`),
   checkWalletKyc: (address) => apiCall(`/api/auth/wallets/${address}/kyc`),
-  approveKyc: (sessionId) => apiCall(`/api/auth/kyc/${sessionId}/approve`, 'POST'),
+  approveKyc: (sessionId, body) => apiCall(`/api/auth/kyc/${sessionId}/approve`, 'POST', body),
   rejectKyc: (sessionId, body) => apiCall(`/api/auth/kyc/${sessionId}/reject`, 'POST', body),
   listSessions: () => apiCall('/api/auth/kyc'),
 };
