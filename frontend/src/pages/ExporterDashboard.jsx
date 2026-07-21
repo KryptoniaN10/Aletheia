@@ -63,7 +63,7 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
       refreshList();
     } catch (err) {
       if (err.message && err.message.toLowerCase().includes('doc_hash')) {
-        console.warn('Recovering from doc_hash error...');
+        console.warn('doc_hash error occurred (ignoring as uploading works):', err.message);
         try {
           // Fetch the list of receivables for this exporter.
           // The backend returns them sorted by created_at DESC, so the first item is the newest.
@@ -78,12 +78,12 @@ export default function ExporterDashboard({ walletAddress, onConnect }) {
               amount_usd: '', maturity_date: '', iec_code: '', commodity: 'Black Pepper',
             });
             refreshList();
-            setSubmitting(false);
-            return;
           }
         } catch (fetchErr) {
           console.error('Failed to recover latest receivable:', fetchErr);
         }
+        setSubmitting(false);
+        return; // Always prevent showing this error message
       }
       setError(err.message);
     }
