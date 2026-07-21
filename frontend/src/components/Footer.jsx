@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import NetworkStatusIndicator from './NetworkStatusIndicator.jsx';
+import LegalModal from './LegalModal.jsx';
 
 export default function Footer() {
+  const [activeModal, setActiveModal] = useState(null);
+
   return (
     <footer style={{
       background: 'var(--color-bg-ink-dark)',
@@ -40,13 +43,34 @@ export default function Footer() {
             <h5 className="form-label" style={{ color: 'var(--color-saffron-light)', marginBottom: 'var(--space-3)' }}>Legals & Safety</h5>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem' }}>
               <li>
-                <a href="#terms" style={{ color: 'inherit', opacity: 0.7 }}>Terms of Service</a>
+                <button 
+                  onClick={() => setActiveModal('terms')}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', opacity: 0.75, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', textAlign: 'left' }}
+                  onMouseOver={(e) => e.currentTarget.style.opacity = 1}
+                  onMouseOut={(e) => e.currentTarget.style.opacity = 0.75}
+                >
+                  Terms of Service
+                </button>
               </li>
               <li>
-                <a href="#privacy" style={{ color: 'inherit', opacity: 0.7 }}>Privacy & KYC Policy</a>
+                <button 
+                  onClick={() => setActiveModal('privacy')}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', opacity: 0.75, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', textAlign: 'left' }}
+                  onMouseOver={(e) => e.currentTarget.style.opacity = 1}
+                  onMouseOut={(e) => e.currentTarget.style.opacity = 0.75}
+                >
+                  Privacy & KYC Policy
+                </button>
               </li>
               <li>
-                <a href="#audit" style={{ color: 'inherit', opacity: 0.7 }}>Smart Contract Audits</a>
+                <button 
+                  onClick={() => setActiveModal('audit')}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', opacity: 0.75, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', textAlign: 'left' }}
+                  onMouseOver={(e) => e.currentTarget.style.opacity = 1}
+                  onMouseOut={(e) => e.currentTarget.style.opacity = 0.75}
+                >
+                  Smart Contract Audits
+                </button>
               </li>
             </ul>
           </div>
@@ -74,6 +98,9 @@ export default function Footer() {
           <span>Stellar Build Better 2026 Submission · Built for Demonstration Purposes</span>
         </div>
       </div>
+
+      {/* Interactive Legal & Technical Documentation Modal */}
+      <LegalModal activeModal={activeModal} onClose={() => setActiveModal(null)} />
     </footer>
   );
 }
